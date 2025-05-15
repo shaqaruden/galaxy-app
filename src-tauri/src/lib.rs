@@ -47,19 +47,59 @@ enum Action {
 /// * `height`: The new height of the window. If `None`, the current height is maintained.
 /// * `gutter`: The gutter size to use when maximizing the window. If `None`, a default gutter size is used.
 #[tauri::command]
-fn move_window(
-    action: Option<Action>
-) -> Result<(), String> {
+fn move_window(action: Option<Action>) -> Result<(), String> {
     println!("move_window called with action: {:?}", action);
     #[cfg(target_os = "windows")]
     {
         use std::ptr;
 
-        use winapi::shared::windef::HWND;
+        use winapi::shared::windef::{HWND, RECT};
+        use winapi::um::dwmapi::{
+            DwmGetWindowAttribute, DwmSetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS,
+        };
         use winapi::um::winuser::{
-            GetDpiForWindow, GetSystemMetricsForDpi, SM_CXSCREEN, SM_CYSCREEN,
+            AdjustWindowRectEx, GetClientRect, GetDpiForWindow, GetMonitorInfoW,
+            GetSystemMetricsForDpi, GetWindowLongW, GetWindowPlacement, MonitorFromWindow,
+            GWL_EXSTYLE, GWL_STYLE, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+            MONITOR_DEFAULTTOPRIMARY, SM_CXSCREEN, SM_CXSIZEFRAME, SM_CYSCREEN, SM_CYSIZEFRAME,
+            SWP_FRAMECHANGED, WINDOWPLACEMENT, WS_OVERLAPPEDWINDOW,
         };
         use winapi::um::winuser::{GetForegroundWindow, GetWindowRect, SetWindowPos};
+
+        #[cfg(target_os = "windows")]
+        unsafe fn log_window_metrics(hwnd: HWND) {
+            // Get window rect (full window including shadows)
+            let mut window_rect = std::mem::zeroed();
+            let mut extended_frame: RECT = std::mem::zeroed();
+
+            if GetWindowRect(hwnd, &mut window_rect) != 0
+                && DwmGetWindowAttribute(
+                    hwnd,
+                    DWMWA_EXTENDED_FRAME_BOUNDS,
+                    &mut extended_frame as *mut RECT as *mut _,
+                    std::mem::size_of::<RECT>() as u32,
+                ) == 0
+            {
+                // Calculate shadow sizes
+                let shadow_left = extended_frame.left - window_rect.left;
+                let shadow_top = extended_frame.top - window_rect.top;
+                let shadow_right = window_rect.right - extended_frame.right;
+                let shadow_bottom = window_rect.bottom - extended_frame.bottom;
+
+                println!("Window Metrics:");
+                println!(
+                    "  Visible Frame: {}x{} at ({},{})",
+                    extended_frame.right - extended_frame.left,
+                    extended_frame.bottom - extended_frame.top,
+                    extended_frame.left,
+                    extended_frame.top
+                );
+                println!(
+                    "  Shadow Offsets: left={}, top={}, right={}, bottom={}",
+                    shadow_left, shadow_top, shadow_right, shadow_bottom
+                );
+            }
+        }
 
         unsafe {
             let hwnd: HWND = GetForegroundWindow();
@@ -146,7 +186,10 @@ fn move_window(
                         current_monitor
                     }
                     &Action::Maximize { gutter } => {
-                        println!("Maximizing window on current monitor with gutter {}", gutter);
+                        println!(
+                            "Maximizing window on current monitor with gutter {}",
+                            gutter
+                        );
                         current_monitor
                     }
                 };
@@ -158,51 +201,109 @@ fn move_window(
                 let current_height = rect.bottom - rect.top;
 
                 // Calculate current monitor work area dimensions
-                let current_work_width = current_monitor_info.work_right - current_monitor_info.work_left;
-                let current_work_height = current_monitor_info.work_bottom - current_monitor_info.work_top;
+                let current_work_width =
+                    current_monitor_info.work_right - current_monitor_info.work_left;
+                let current_work_height =
+                    current_monitor_info.work_bottom - current_monitor_info.work_top;
 
                 // Calculate target monitor work area dimensions
-                let target_work_width = target_monitor_info.work_right - target_monitor_info.work_left;
-                let target_work_height = target_monitor_info.work_bottom - target_monitor_info.work_top;
+                let target_work_width =
+                    target_monitor_info.work_right - target_monitor_info.work_left;
+                let target_work_height =
+                    target_monitor_info.work_bottom - target_monitor_info.work_top;
 
                 // Calculate relative position within current monitor work area (as percentages)
-                let relative_x = (window_center_x - current_monitor_info.work_left) as f32 / current_work_width as f32;
-                let relative_y = (window_center_y - current_monitor_info.work_top) as f32 / current_work_height as f32;
+                let relative_x = (window_center_x - current_monitor_info.work_left) as f32
+                    / current_work_width as f32;
+                let relative_y = (window_center_y - current_monitor_info.work_top) as f32
+                    / current_work_height as f32;
 
                 // Calculate new dimensions and position based on action
-                let (new_width, new_height, new_x, new_y) = match action.as_ref().unwrap_or(&Action::None) {
-                    &Action::Maximize { gutter } => {
-                        // For maximize, use the monitor's work area dimensions minus gutter
-                        let adjusted_width = target_work_width - (gutter * 2);
-                        let adjusted_height = target_work_height - (gutter * 2);
-                        (
-                            adjusted_width,
-                            adjusted_height,
-                            target_monitor_info.work_left + gutter,
-                            target_monitor_info.work_top + gutter
-                        )
-                    }
-                    _ => {
-                        // For other actions, maintain aspect ratio if possible
-                        let width_percentage = current_width as f32 / current_work_width as f32;
-                        let height_percentage = current_height as f32 / current_work_height as f32;
+                let (new_width, new_height, new_x, new_y) =
+                    match action.as_ref().unwrap_or(&Action::None) {
+                        &Action::Maximize { gutter } => {
+                            // Get the monitor info for proper work area
+                            let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                            let mut monitor_info: MONITORINFO = std::mem::zeroed();
+                            monitor_info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
 
-                        let new_width = (target_work_width as f32 * width_percentage).min(target_work_width as f32) as i32;
-                        let new_height = (target_work_height as f32 * height_percentage).min(target_work_height as f32) as i32;
+                            if GetMonitorInfoW(monitor, &mut monitor_info) == 0 {
+                                return Err("Failed to get monitor info".to_string());
+                            }
 
-                        // Calculate new center position
-                        let new_center_x = target_monitor_info.work_left + (target_work_width as f32 * relative_x) as i32;
-                        let new_center_y = target_monitor_info.work_top + (target_work_height as f32 * relative_y) as i32;
+                            // Use the actual work area from monitor info
+                            let work_area = monitor_info.rcWork;
+                            let dpi = GetDpiForWindow(hwnd);
+                            let dpi_scale = dpi as f32 / 96.0; // 96 is the default DPI
 
-                        // Calculate final window position ensuring it stays within work area bounds
-                        let new_x = (new_center_x - new_width / 2).max(target_monitor_info.work_left)
-                            .min(target_monitor_info.work_right - new_width);
-                        let new_y = (new_center_y - new_height / 2).max(target_monitor_info.work_top)
-                            .min(target_monitor_info.work_bottom - new_height);
+                            // Get the extended frame bounds first to understand current shadow size
+                            let mut window_rect = std::mem::zeroed();
+                            let mut extended_frame: RECT = std::mem::zeroed();
+                            if GetWindowRect(hwnd, &mut window_rect) == 0
+                                || DwmGetWindowAttribute(
+                                    hwnd,
+                                    DWMWA_EXTENDED_FRAME_BOUNDS,
+                                    &mut extended_frame as *mut RECT as *mut _,
+                                    std::mem::size_of::<RECT>() as u32,
+                                ) != 0
+                            {
+                                return Err("Failed to get window metrics".to_string());
+                            }
 
-                        (new_width, new_height, new_x, new_y)
-                    }
-                };
+                            // Calculate shadow offsets
+                            let shadow_left = extended_frame.left - window_rect.left;
+                            let shadow_top = extended_frame.top - window_rect.top;
+                            let shadow_right = window_rect.right - extended_frame.right;
+                            let shadow_bottom = window_rect.bottom - extended_frame.bottom;
+
+                            // Calculate dimensions accounting for DPI and gutter
+                            let scaled_gutter = (gutter as f32 * dpi_scale) as i32;
+                            let work_width = work_area.right - work_area.left;
+                            let work_height = work_area.bottom - work_area.top;
+
+                            // Adjust for shadow offsets to ensure the visible window fills the space
+                            let adjusted_width =
+                                work_width - (scaled_gutter * 2) + shadow_left + shadow_right;
+                            let adjusted_height =
+                                work_height - (scaled_gutter * 2) + shadow_top + shadow_bottom;
+
+                            (
+                                adjusted_width,
+                                adjusted_height,
+                                work_area.left + scaled_gutter - shadow_left,
+                                work_area.top + scaled_gutter - shadow_top,
+                            )
+                        }
+                        _ => {
+                            // For other actions, maintain aspect ratio if possible
+                            let width_percentage = current_width as f32 / current_work_width as f32;
+                            let height_percentage =
+                                current_height as f32 / current_work_height as f32;
+
+                            let new_width = (target_work_width as f32 * width_percentage)
+                                .min(target_work_width as f32)
+                                as i32;
+                            let new_height = (target_work_height as f32 * height_percentage)
+                                .min(target_work_height as f32)
+                                as i32;
+
+                            // Calculate new center position
+                            let new_center_x = target_monitor_info.work_left
+                                + (target_work_width as f32 * relative_x) as i32;
+                            let new_center_y = target_monitor_info.work_top
+                                + (target_work_height as f32 * relative_y) as i32;
+
+                            // Calculate final window position ensuring it stays within work area bounds
+                            let new_x = (new_center_x - new_width / 2)
+                                .max(target_monitor_info.work_left)
+                                .min(target_monitor_info.work_right - new_width);
+                            let new_y = (new_center_y - new_height / 2)
+                                .max(target_monitor_info.work_top)
+                                .min(target_monitor_info.work_bottom - new_height);
+
+                            (new_width, new_height, new_x, new_y)
+                        }
+                    };
 
                 let result = SetWindowPos(
                     hwnd,
@@ -211,7 +312,7 @@ fn move_window(
                     new_y,
                     new_width,
                     new_height,
-                    0,                    // Remove SWP_NOMOVE flag to allow movement
+                    SWP_FRAMECHANGED, // Force frame recalculation
                 );
                 if result != 0 {
                     println!("Window moved successfully");
@@ -255,40 +356,40 @@ fn get_monitor_info() {
 }
 
 unsafe extern "system" fn enum_monitor_callback(
-  monitor: winapi::shared::windef::HMONITOR,
-  _: winapi::shared::windef::HDC,
-  _: *mut winapi::shared::windef::RECT,
-  _: winapi::shared::minwindef::LPARAM,
+    monitor: winapi::shared::windef::HMONITOR,
+    _: winapi::shared::windef::HDC,
+    _: *mut winapi::shared::windef::RECT,
+    _: winapi::shared::minwindef::LPARAM,
 ) -> i32 {
-  let mut monitor_info: MONITORINFOEXW = unsafe { std::mem::zeroed() };
-  monitor_info.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+    let mut monitor_info: MONITORINFOEXW = unsafe { std::mem::zeroed() };
+    monitor_info.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
 
-  if GetMonitorInfoW(
-      monitor,
-      &mut monitor_info as *mut MONITORINFOEXW as *mut MONITORINFO,
-  ) != 0
-  {
-      let width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
-      let height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
-      println!(
-          "Monitor at ({}, {}): {}x{}",
-          monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, width, height
-      );
+    if GetMonitorInfoW(
+        monitor,
+        &mut monitor_info as *mut MONITORINFOEXW as *mut MONITORINFO,
+    ) != 0
+    {
+        let width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
+        let height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+        println!(
+            "Monitor at ({}, {}): {}x{}",
+            monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, width, height
+        );
 
-      // Store monitor information
-      MONITORS.lock().unwrap().push(MonitorInfo {
-          left: monitor_info.rcMonitor.left,
-          top: monitor_info.rcMonitor.top,
-          right: monitor_info.rcMonitor.right,
-          bottom: monitor_info.rcMonitor.bottom,
-          work_left: monitor_info.rcWork.left,
-          work_top: monitor_info.rcWork.top,
-          work_right: monitor_info.rcWork.right,
-          work_bottom: monitor_info.rcWork.bottom,
-      });
-  }
+        // Store monitor information
+        MONITORS.lock().unwrap().push(MonitorInfo {
+            left: monitor_info.rcMonitor.left,
+            top: monitor_info.rcMonitor.top,
+            right: monitor_info.rcMonitor.right,
+            bottom: monitor_info.rcMonitor.bottom,
+            work_left: monitor_info.rcWork.left,
+            work_top: monitor_info.rcWork.top,
+            work_right: monitor_info.rcWork.right,
+            work_bottom: monitor_info.rcWork.bottom,
+        });
+    }
 
-  1 // Continue enumeration
+    1 // Continue enumeration
 }
 
 pub fn run() {
@@ -301,53 +402,57 @@ pub fn run() {
                 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
                 // Define shortcuts using strings (format: "modifiers+key")
-                let move_monitor_left = Shortcut::from_str("CommandOrControl+Alt+Shift+ArrowLeft").unwrap();
-                let move_monitor_right = Shortcut::from_str("CommandOrControl+Alt+Shift+ArrowRight").unwrap();
+                let move_monitor_left =
+                    Shortcut::from_str("CommandOrControl+Alt+Shift+ArrowLeft").unwrap();
+                let move_monitor_right =
+                    Shortcut::from_str("CommandOrControl+Alt+Shift+ArrowRight").unwrap();
                 let maximize_window = Shortcut::from_str("CommandOrControl+Alt+Enter").unwrap();
-                let almost_maximize_window = Shortcut::from_str("CommandOrControl+Alt+Shift+Enter").unwrap();
+                let almost_maximize_window =
+                    Shortcut::from_str("CommandOrControl+Alt+Shift+Enter").unwrap();
 
                 app.handle().plugin(
-                    tauri_plugin_global_shortcut::Builder::new().with_handler(move |_app, shortcut, event| {
-                        println!("{:?}", shortcut);
-                        if shortcut == &move_monitor_left {
-                            match event.state() {
-                              ShortcutState::Pressed => {}
-                              ShortcutState::Released => {
-                                let _ = move_window(Some(Action::MoveLeft));
-                              }
+                    tauri_plugin_global_shortcut::Builder::new()
+                        .with_handler(move |_app, shortcut, event| {
+                            println!("{:?}", shortcut);
+                            if shortcut == &move_monitor_left {
+                                match event.state() {
+                                    ShortcutState::Pressed => {}
+                                    ShortcutState::Released => {
+                                        let _ = move_window(Some(Action::MoveLeft));
+                                    }
+                                }
                             }
-                        }
 
-                        if shortcut == &move_monitor_right {
-                            match event.state() {
-                              ShortcutState::Pressed => {}
-                              ShortcutState::Released => {
-                                let _ = move_window(Some(Action::MoveRight));
-                              }
+                            if shortcut == &move_monitor_right {
+                                match event.state() {
+                                    ShortcutState::Pressed => {}
+                                    ShortcutState::Released => {
+                                        let _ = move_window(Some(Action::MoveRight));
+                                    }
+                                }
                             }
-                        }
 
-                        if shortcut == &maximize_window {
-                            match event.state() {
-                              ShortcutState::Pressed => {}
-                              ShortcutState::Released => {
-                                let _ = move_window(Some(Action::Maximize { gutter: 0 }));
-                                println!("Maximize window");
-                              }
+                            if shortcut == &maximize_window {
+                                match event.state() {
+                                    ShortcutState::Pressed => {}
+                                    ShortcutState::Released => {
+                                        let _ = move_window(Some(Action::Maximize { gutter: 0 }));
+                                        println!("Maximize window");
+                                    }
+                                }
                             }
-                        }
 
-                        if shortcut == &almost_maximize_window {
-                            match event.state() {
-                              ShortcutState::Pressed => {}
-                              ShortcutState::Released => {
-                                let _ = move_window(Some(Action::Maximize { gutter: 32 }));
-                                println!("Almost Maximize window");
-                              }
+                            if shortcut == &almost_maximize_window {
+                                match event.state() {
+                                    ShortcutState::Pressed => {}
+                                    ShortcutState::Released => {
+                                        let _ = move_window(Some(Action::Maximize { gutter: 32 }));
+                                        println!("Almost Maximize window");
+                                    }
+                                }
                             }
-                        }
-                    })
-                    .build(),
+                        })
+                        .build(),
                 )?;
 
                 app.global_shortcut().register(move_monitor_left)?;

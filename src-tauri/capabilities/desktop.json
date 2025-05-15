@@ -12,6 +12,9 @@
     "global-shortcut:default",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",
-    "global-shortcut:allow-unregister"
+    "global-shortcut:allow-unregister",
+    "core:window:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close"
   ]
 }
