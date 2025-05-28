@@ -1,7 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::sync::Mutex;
+
+mod shortcuts;
+use shortcuts::{update_shortcut, ShortcutManager};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -190,6 +194,7 @@ fn move_window(action: Option<Action>) -> Result<(), String> {
                             "Maximizing window on current monitor with gutter {}",
                             gutter
                         );
+                        println!("Current monitor info: {:?}", current_monitor_info);
                         current_monitor
                     }
                 };
@@ -261,11 +266,28 @@ fn move_window(action: Option<Action>) -> Result<(), String> {
                             let work_width = work_area.right - work_area.left;
                             let work_height = work_area.bottom - work_area.top;
 
+                            println!(
+                                "Work area: {}x{} at ({},{})",
+                                work_width, work_height, work_area.left, work_area.top
+                            );
+                            println!(
+                                "Shadow offsets: left={}, top={}, right={}, bottom={}",
+                                shadow_left, shadow_top, shadow_right, shadow_bottom
+                            );
+
                             // Adjust for shadow offsets to ensure the visible window fills the space
                             let adjusted_width =
                                 work_width - (scaled_gutter * 2) + shadow_left + shadow_right;
                             let adjusted_height =
                                 work_height - (scaled_gutter * 2) + shadow_top + shadow_bottom;
+
+                            println!(
+                                "Adjusted window dimensions: {}x{} at ({},{})",
+                                adjusted_width,
+                                adjusted_height,
+                                work_area.left + scaled_gutter - shadow_left,
+                                work_area.top + scaled_gutter - shadow_top
+                            );
 
                             (
                                 adjusted_width,
@@ -393,74 +415,28 @@ unsafe extern "system" fn enum_monitor_callback(
 }
 
 pub fn run() {
+    // Create the shared shortcut config ONCE
+    let shortcuts_config = Arc::new(Mutex::new(
+        shortcuts::ShortcutsConfig::load().unwrap_or_default(),
+    ));
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
-            #[cfg(desktop)]
-            {
-                use std::str::FromStr;
-                use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
-
-                // Define shortcuts using strings (format: "modifiers+key")
-                let move_monitor_left =
-                    Shortcut::from_str("CommandOrControl+Alt+Shift+ArrowLeft").unwrap();
-                let move_monitor_right =
-                    Shortcut::from_str("CommandOrControl+Alt+Shift+ArrowRight").unwrap();
-                let maximize_window = Shortcut::from_str("CommandOrControl+Alt+Enter").unwrap();
-                let almost_maximize_window =
-                    Shortcut::from_str("CommandOrControl+Alt+Shift+Enter").unwrap();
-
-                app.handle().plugin(
-                    tauri_plugin_global_shortcut::Builder::new()
-                        .with_handler(move |_app, shortcut, event| {
-                            println!("{:?}", shortcut);
-                            if shortcut == &move_monitor_left {
-                                match event.state() {
-                                    ShortcutState::Pressed => {}
-                                    ShortcutState::Released => {
-                                        let _ = move_window(Some(Action::MoveLeft));
-                                    }
-                                }
-                            }
-
-                            if shortcut == &move_monitor_right {
-                                match event.state() {
-                                    ShortcutState::Pressed => {}
-                                    ShortcutState::Released => {
-                                        let _ = move_window(Some(Action::MoveRight));
-                                    }
-                                }
-                            }
-
-                            if shortcut == &maximize_window {
-                                match event.state() {
-                                    ShortcutState::Pressed => {}
-                                    ShortcutState::Released => {
-                                        let _ = move_window(Some(Action::Maximize { gutter: 0 }));
-                                        println!("Maximize window");
-                                    }
-                                }
-                            }
-
-                            if shortcut == &almost_maximize_window {
-                                match event.state() {
-                                    ShortcutState::Pressed => {}
-                                    ShortcutState::Released => {
-                                        let _ = move_window(Some(Action::Maximize { gutter: 32 }));
-                                        println!("Almost Maximize window");
-                                    }
-                                }
-                            }
-                        })
-                        .build(),
-                )?;
-
-                app.global_shortcut().register(move_monitor_left)?;
-                app.global_shortcut().register(move_monitor_right)?;
-                app.global_shortcut().register(maximize_window)?;
-                app.global_shortcut().register(almost_maximize_window)?;
+        .manage(ShortcutManager::new(shortcuts_config.clone()))
+        .invoke_handler(tauri::generate_handler![update_shortcut])
+        .setup({
+            let shortcuts_config = shortcuts_config.clone();
+            move |app| {
+                #[cfg(desktop)]
+                {
+                    // Register all shortcuts
+                    if let Err(e) = shortcuts::register_shortcuts(app, shortcuts_config.clone()) {
+                        eprintln!("Failed to register shortcuts: {}", e);
+                        return Err(e.into());
+                    }
+                }
+                Ok(())
             }
-            Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

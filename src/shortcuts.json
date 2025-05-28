@@ -1,0 +1,18 @@
+{
+  "moveMonitorLeft": {
+    "name": "Move to Left Monitor",
+    "defaultShortcut": "shift+control+alt+ArrowLeft"
+  },
+  "moveMonitorRight": {
+    "name": "Move to Right Monitor",
+    "defaultShortcut": "shift+control+alt+ArrowRight"
+  },
+  "maximizeWindow": {
+    "name": "Maximize Window",
+    "defaultShortcut": "control+alt+Enter"
+  },
+  "almostMaximizeWindow": {
+    "name": "Almost Maximize Window",
+    "defaultShortcut": "shift+control+alt+Enter"
+  }
+}

@@ -1,27 +1,41 @@
 <script setup>
+import { ref } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import LeftHalf from './components/icons/LeftHalf.vue';
-import RightHalf from './components/icons/RightHalf.vue';
-import CenterHalf from './components/icons/CenterHalf.vue';
-import TopHalf from './components/icons/TopHalf.vue';
-import BottomHalf from './components/icons/BottomHalf.vue';
-import FirstThird from './components/icons/FirstThird.vue';
-import FirstTwoThirds from './components/icons/FirstTwoThirds.vue';
-import LastThird from './components/icons/LastThird.vue';
-import LastTwoThirds from './components/icons/LastTwoThirds.vue';
-import CenterThird from './components/icons/CenterThird.vue';
+import { invoke } from '@tauri-apps/api/core';
+import ShortcutInput from './components/ShortcutInput.vue';
+
+// Icons
 import MoveLeftDisplay from './components/icons/MoveLeftDisplay.vue';
 import MoveRightDisplay from './components/icons/MoveRightDisplay.vue';
 import Maximize from './components/icons/Maximize.vue';
 import AlmostMaximize from './components/icons/AlmostMaximize.vue';
-import MaximizeHeight from './components/icons/MaximizeHeight.vue';
-import MakeSmaller from './components/icons/MakeSmaller.vue';
-import MakeLarger from './components/icons/MakeLarger.vue';
 
+// Reactive state for shortcuts
+const shortcuts = ref({
+  moveMonitorLeft: 'Shift+Control+Alt+ArrowLeft',
+  moveMonitorRight: 'Shift+Control+Alt+ArrowRight',
+  maximizeWindow: 'Control+Alt+Enter',
+  almostMaximizeWindow: 'Shift+Control+Alt+Enter',
+});
+
+// Handle window close
 async function closeWindow() {
   const window = await getCurrentWindow();
   await window.close();
 }
+
+// Handle shortcut save
+const handleShortcutSave = async ({ id, shortcut }) => {
+  console.log(`Shortcut ${id} updated to:`, shortcut);
+  try {
+    await invoke('update_shortcut', {
+      shortcutId: id,
+      newShortcut: shortcut,
+    });
+  } catch (error) {
+    console.error('Failed to update shortcut:', error);
+  }
+};
 </script>
 
 <template>
@@ -39,73 +53,37 @@ async function closeWindow() {
       <v-container class="pa-6 pt-2" style="display: flex; flex-direction: column; gap: 16px;">
         <v-row style="gap: 16px;" class="py-2">
           <v-col style="padding: 0; display: flex; flex-direction: column; gap: 8px;">
-            <v-text-field variant="outlined" density="compact" label="Left Half" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
-                <LeftHalf />
+            <ShortcutInput v-model="shortcuts.moveMonitorLeft" label="Move to Left Monitor"
+              shortcut-id="moveMonitorLeft" @save="handleShortcutSave">
+              <template #icon>
+                <MoveLeftDisplay />
               </template>
-            </v-text-field>
-            <v-text-field variant="outlined" density="compact" label="Right Half" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
-                <RightHalf />
-              </template>
-            </v-text-field>
-            <v-text-field variant="outlined" density="compact" label="Center Half" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
-                <CenterHalf />
-              </template>
-            </v-text-field>
-            <v-text-field variant="outlined" density="compact" label="Top Half" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
-                <TopHalf />
-              </template>
-            </v-text-field>
-            <v-text-field variant="outlined" density="compact" label="Bottom Half" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
-                <BottomHalf />
-              </template>
-            </v-text-field>
-          </v-col>
+            </ShortcutInput>
 
-          <v-col style="padding: 0; display: flex; flex-direction: column; gap: 8px;">
-            <v-text-field variant="outlined" density="compact" label="Maximize" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
+            <ShortcutInput v-model="shortcuts.moveMonitorRight" label="Move to Right Monitor"
+              shortcut-id="moveMonitorRight" @save="handleShortcutSave">
+              <template #icon>
+                <MoveRightDisplay />
+              </template>
+            </ShortcutInput>
+
+            <ShortcutInput v-model="shortcuts.maximizeWindow" label="Maximize Window" shortcut-id="maximizeWindow"
+              @save="handleShortcutSave">
+              <template #icon>
                 <Maximize />
               </template>
-            </v-text-field>
-            <v-text-field variant="outlined" density="compact" label="Almost Maximize" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
+            </ShortcutInput>
+
+            <ShortcutInput v-model="shortcuts.almostMaximizeWindow" label="Almost Maximize Window"
+              shortcut-id="almostMaximizeWindow" @save="handleShortcutSave">
+              <template #icon>
                 <AlmostMaximize />
               </template>
-            </v-text-field>
-            <v-text-field variant="outlined" density="compact" label="Maximize Height" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
-                <MaximizeHeight />
-              </template>
-            </v-text-field>
-            <v-text-field variant="outlined" density="compact" label="Make Smaller" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
-                <MakeSmaller />
-              </template>
-            </v-text-field>
-            <v-text-field variant="outlined" density="compact" label="Make Larger" placeholder="Record Shortcut"
-              hide-details>
-              <template v-slot:prepend-inner>
-                <MakeLarger />
-              </template>
-            </v-text-field>
+            </ShortcutInput>
           </v-col>
         </v-row>
 
-        <v-row style="gap: 16px;" class="py-2">
+        <!-- <v-row style="gap: 16px;" class="py-2">
           <v-col style="padding: 0; display: flex; flex-direction: column; gap: 8px;">
             <v-text-field variant="outlined" density="compact" label="First Third" placeholder="Record Shortcut"
               hide-details>
@@ -135,7 +113,7 @@ async function closeWindow() {
             <v-text-field variant="outlined" density="compact" label="Right Half" placeholder="Record Shortcut"
               hide-details></v-text-field>
           </v-col>
-        </v-row>
+        </v-row> -->
       </v-container>
     </v-main>
   </v-app>
