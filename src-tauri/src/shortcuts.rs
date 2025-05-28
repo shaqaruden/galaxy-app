@@ -140,6 +140,17 @@ pub async fn update_shortcut(
             "Successfully updated shortcut {} from {} to {}",
             shortcut_id, old_shortcut_str, new_shortcut
         );
+
+        // Save updated shortcuts config to shortcuts.json
+        // Use the same path logic as ShortcutsConfig::load()
+        let frontend_dir = std::env::current_dir().unwrap().parent().unwrap().join("src");
+        let config_path = frontend_dir.join("shortcuts.json");
+        let json = serde_json::to_string_pretty(&*shortcuts)
+            .map_err(|e| format!("Failed to serialize shortcuts: {}", e))?;
+        std::fs::write(&config_path, json)
+            .map_err(|e| format!("Failed to write to {:?}: {}", config_path, e))?;
+        println!("Shortcuts saved to {:?}", config_path);
+
         Ok(())
     } else {
         Err(format!("Shortcut {} not found", shortcut_id))
