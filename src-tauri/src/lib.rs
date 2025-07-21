@@ -38,6 +38,10 @@ enum Action {
     MoveUp,
     MoveDown,
     Maximize { gutter: i32 },
+    LeftHalf,
+    RightHalf,
+    TopHalf,
+    BottomHalf,
     None,
 }
 
@@ -196,6 +200,14 @@ fn move_window(action: Option<Action>) -> Result<(), String> {
                         println!("Current monitor info: {:?}", current_monitor_info);
                         current_monitor
                     }
+                    &Action::LeftHalf
+                    | &Action::RightHalf
+                    | &Action::TopHalf
+                    | &Action::BottomHalf => {
+                        // For halves, stay on current monitor
+                        println!("Snapping to half on current monitor");
+                        current_monitor
+                    }
                 };
 
                 let target_monitor_info = &monitors[target_monitor];
@@ -294,6 +306,58 @@ fn move_window(action: Option<Action>) -> Result<(), String> {
                                 work_area.left + scaled_gutter - shadow_left,
                                 work_area.top + scaled_gutter - shadow_top,
                             )
+                        }
+                        &Action::LeftHalf => {
+                            // Snap to left half of the monitor
+                            let new_width = target_work_width / 2;
+                            let new_height = target_work_height;
+                            let new_x = target_monitor_info.work_left;
+                            let new_y = target_monitor_info.work_top;
+
+                            println!(
+                                "Snapping to left half: {}x{} at ({},{})",
+                                new_width, new_height, new_x, new_y
+                            );
+                            (new_width, new_height, new_x, new_y)
+                        }
+                        &Action::RightHalf => {
+                            // Snap to right half of the monitor
+                            let new_width = target_work_width / 2;
+                            let new_height = target_work_height;
+                            let new_x = target_monitor_info.work_left + target_work_width / 2;
+                            let new_y = target_monitor_info.work_top;
+
+                            println!(
+                                "Snapping to right half: {}x{} at ({},{})",
+                                new_width, new_height, new_x, new_y
+                            );
+                            (new_width, new_height, new_x, new_y)
+                        }
+                        &Action::TopHalf => {
+                            // Snap to top half of the monitor
+                            let new_width = target_work_width;
+                            let new_height = target_work_height / 2;
+                            let new_x = target_monitor_info.work_left;
+                            let new_y = target_monitor_info.work_top;
+
+                            println!(
+                                "Snapping to top half: {}x{} at ({},{})",
+                                new_width, new_height, new_x, new_y
+                            );
+                            (new_width, new_height, new_x, new_y)
+                        }
+                        &Action::BottomHalf => {
+                            // Snap to bottom half of the monitor
+                            let new_width = target_work_width;
+                            let new_height = target_work_height / 2;
+                            let new_x = target_monitor_info.work_left;
+                            let new_y = target_monitor_info.work_top + target_work_height / 2;
+
+                            println!(
+                                "Snapping to bottom half: {}x{} at ({},{})",
+                                new_width, new_height, new_x, new_y
+                            );
+                            (new_width, new_height, new_x, new_y)
                         }
                         _ => {
                             // For other actions, maintain aspect ratio if possible
