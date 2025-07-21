@@ -5,29 +5,48 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 mod shortcuts;
+mod window_actions;
+
 use shortcuts::{update_shortcut, ShortcutManager};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
 use winapi::um::winuser::{EnumDisplayMonitors, GetMonitorInfoW, MONITORINFO, MONITORINFOEXW};
+use window_actions::*;
 use window_vibrancy::apply_mica;
 
 // Global storage for monitor information
 static MONITORS: Lazy<Mutex<Vec<MonitorInfo>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
 #[derive(Clone, Debug)]
-struct MonitorInfo {
+pub struct MonitorInfo {
     // Full monitor dimensions
-    left: i32,
-    top: i32,
-    right: i32,
-    bottom: i32,
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
     // Work area (excludes taskbar and other reserved areas)
-    work_left: i32,
-    work_top: i32,
-    work_right: i32,
-    work_bottom: i32,
+    pub work_left: i32,
+    pub work_top: i32,
+    pub work_right: i32,
+    pub work_bottom: i32,
+}
+
+#[derive(Clone, Debug)]
+pub struct WindowInfo {
+    pub current_width: i32,
+    pub current_height: i32,
+    pub center_x: i32,
+    pub center_y: i32,
+}
+
+#[derive(Clone, Debug)]
+pub struct ActionContext {
+    pub current_monitor: usize,
+    pub target_monitor: usize,
+    pub monitors: Vec<MonitorInfo>,
+    pub window_info: WindowInfo,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -45,370 +64,108 @@ enum Action {
     None,
 }
 
+impl Action {
+    fn get_handler(&self) -> Box<dyn WindowActionHandler> {
+        match self {
+            Action::MoveLeft => Box::new(MoveLeftAction),
+            Action::MoveRight => Box::new(MoveRightAction),
+            Action::Maximize { gutter } => Box::new(MaximizeAction { gutter: *gutter }),
+            Action::LeftHalf => Box::new(LeftHalfAction),
+            Action::RightHalf => Box::new(RightHalfAction),
+            Action::TopHalf => Box::new(TopHalfAction),
+            Action::BottomHalf => Box::new(BottomHalfAction),
+            _ => Box::new(NoOpAction),
+        }
+    }
+}
+
 /// Moves the currently focused window to a new position and/or size.
-///
-/// # Arguments
-///
-/// * `action`: The action to perform on the window. If `None`, no action is taken.
-/// * `width`: The new width of the window. If `None`, the current width is maintained.
-/// * `height`: The new height of the window. If `None`, the current height is maintained.
-/// * `gutter`: The gutter size to use when maximizing the window. If `None`, a default gutter size is used.
 #[tauri::command]
 fn move_window(action: Option<Action>) -> Result<(), String> {
     println!("move_window called with action: {:?}", action);
+
     #[cfg(target_os = "windows")]
     {
         use std::ptr;
-
-        use winapi::shared::windef::{HWND, RECT};
-        use winapi::um::dwmapi::{
-            DwmGetWindowAttribute, DwmSetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS,
-        };
-        use winapi::um::winuser::{
-            AdjustWindowRectEx, GetClientRect, GetDpiForWindow, GetMonitorInfoW,
-            GetSystemMetricsForDpi, GetWindowLongW, GetWindowPlacement, MonitorFromWindow,
-            GWL_EXSTYLE, GWL_STYLE, MONITORINFO, MONITOR_DEFAULTTONEAREST,
-            MONITOR_DEFAULTTOPRIMARY, SM_CXSCREEN, SM_CXSIZEFRAME, SM_CYSCREEN, SM_CYSIZEFRAME,
-            SWP_FRAMECHANGED, WINDOWPLACEMENT, WS_OVERLAPPEDWINDOW,
-        };
+        use winapi::shared::windef::HWND;
+        use winapi::um::winuser::SWP_FRAMECHANGED;
         use winapi::um::winuser::{GetForegroundWindow, GetWindowRect, SetWindowPos};
-
-        #[cfg(target_os = "windows")]
-        unsafe fn log_window_metrics(hwnd: HWND) {
-            // Get window rect (full window including shadows)
-            let mut window_rect = std::mem::zeroed();
-            let mut extended_frame: RECT = std::mem::zeroed();
-
-            if GetWindowRect(hwnd, &mut window_rect) != 0
-                && DwmGetWindowAttribute(
-                    hwnd,
-                    DWMWA_EXTENDED_FRAME_BOUNDS,
-                    &mut extended_frame as *mut RECT as *mut _,
-                    std::mem::size_of::<RECT>() as u32,
-                ) == 0
-            {
-                // Calculate shadow sizes
-                let shadow_left = extended_frame.left - window_rect.left;
-                let shadow_top = extended_frame.top - window_rect.top;
-                let shadow_right = window_rect.right - extended_frame.right;
-                let shadow_bottom = window_rect.bottom - extended_frame.bottom;
-
-                println!("Window Metrics:");
-                println!(
-                    "  Visible Frame: {}x{} at ({},{})",
-                    extended_frame.right - extended_frame.left,
-                    extended_frame.bottom - extended_frame.top,
-                    extended_frame.left,
-                    extended_frame.top
-                );
-                println!(
-                    "  Shadow Offsets: left={}, top={}, right={}, bottom={}",
-                    shadow_left, shadow_top, shadow_right, shadow_bottom
-                );
-            }
-        }
 
         unsafe {
             let hwnd: HWND = GetForegroundWindow();
-            if !hwnd.is_null() {
-                // Get current window position and size
-                let mut rect = std::mem::zeroed();
-                if GetWindowRect(hwnd, &mut rect) == 0 {
-                    return Err("Failed to get window position".to_string());
-                }
+            if hwnd.is_null() {
+                return Err("No focused window found".to_string());
+            }
 
-                // Update monitor information
-                get_monitor_info();
-                println!("Getting monitor info");
+            // Get current window position and size
+            let mut rect = std::mem::zeroed();
+            if GetWindowRect(hwnd, &mut rect) == 0 {
+                return Err("Failed to get window position".to_string());
+            }
 
-                // Find current monitor
-                let monitors = MONITORS.lock().unwrap();
-                let window_center_x = (rect.left + rect.right) / 2;
-                let window_center_y = (rect.top + rect.bottom) / 2;
+            // Update monitor information
+            get_monitor_info();
+            let monitors = MONITORS.lock().unwrap().clone();
 
+            let window_center_x = (rect.left + rect.right) / 2;
+            let window_center_y = (rect.top + rect.bottom) / 2;
+
+            // Find current monitor
+            let current_monitor = monitors
+                .iter()
+                .position(|m| {
+                    window_center_x >= m.left
+                        && window_center_x < m.right
+                        && window_center_y >= m.top
+                        && window_center_y < m.bottom
+                })
+                .unwrap_or(0);
+
+            let window_info = WindowInfo {
+                current_width: rect.right - rect.left,
+                current_height: rect.bottom - rect.top,
+                center_x: window_center_x,
+                center_y: window_center_y,
+            };
+
+            // Get the action handler
+            let action_ref = action.as_ref().unwrap_or(&Action::None);
+            let handler = action_ref.get_handler();
+
+            // Determine target monitor
+            let target_monitor = handler.get_target_monitor(current_monitor, &monitors);
+
+            // Create action context
+            let context = ActionContext {
+                current_monitor,
+                target_monitor,
+                monitors,
+                window_info,
+            };
+
+            // Calculate new position and size
+            let (new_width, new_height, new_x, new_y) =
+                handler.calculate_position(&context, hwnd)?;
+
+            // Apply the changes
+            let result = SetWindowPos(
+                hwnd,
+                ptr::null_mut(),
+                new_x,
+                new_y,
+                new_width,
+                new_height,
+                SWP_FRAMECHANGED,
+            );
+
+            if result != 0 {
                 println!(
-                    "Window center at ({}, {})",
-                    window_center_x, window_center_y
+                    "Window moved successfully to {}x{} at ({},{})",
+                    new_width, new_height, new_x, new_y
                 );
-                let current_monitor = monitors
-                    .iter()
-                    .position(|m| {
-                        let is_in_monitor = window_center_x >= m.left
-                            && window_center_x < m.right
-                            && window_center_y >= m.top
-                            && window_center_y < m.bottom;
-                        println!(
-                            "Checking monitor: left={}, right={}, top={}, bottom={}, matches={}",
-                            m.left, m.right, m.top, m.bottom, is_in_monitor
-                        );
-                        is_in_monitor
-                    })
-                    .unwrap_or(0);
-                println!("Current monitor index: {}", current_monitor);
-
-                let current_monitor_info = &monitors[current_monitor];
-                let target_monitor = match action.as_ref().unwrap_or(&Action::None) {
-                    &Action::MoveLeft => {
-                        // Find the rightmost monitor that is to the left of current monitor
-                        let target = monitors
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, m)| m.right <= current_monitor_info.left) // Only consider monitors to the left
-                            .max_by_key(|(_, m)| m.right) // Get the rightmost one
-                            .map(|(idx, _)| idx)
-                            .unwrap_or_else(|| {
-                                // If no monitor to the left, wrap to rightmost monitor
-                                monitors
-                                    .iter()
-                                    .enumerate()
-                                    .max_by_key(|(_, m)| m.right)
-                                    .map(|(idx, _)| idx)
-                                    .unwrap_or(current_monitor)
-                            });
-                        println!("Moving LEFT to monitor {}", target);
-                        target
-                    }
-                    &Action::MoveRight => {
-                        // Find the leftmost monitor that is to the right of current monitor
-                        let target = monitors
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, m)| m.left >= current_monitor_info.right) // Only consider monitors to the right
-                            .min_by_key(|(_, m)| m.left) // Get the leftmost one
-                            .map(|(idx, _)| idx)
-                            .unwrap_or_else(|| {
-                                // If no monitor to the right, wrap to leftmost monitor
-                                monitors
-                                    .iter()
-                                    .enumerate()
-                                    .min_by_key(|(_, m)| m.left)
-                                    .map(|(idx, _)| idx)
-                                    .unwrap_or(current_monitor)
-                            });
-                        println!("Moving RIGHT to monitor {}", target);
-                        target
-                    }
-                    &Action::MoveUp | &Action::MoveDown | &Action::None => {
-                        println!("No movement");
-                        current_monitor
-                    }
-                    &Action::Maximize { gutter } => {
-                        println!(
-                            "Maximizing window on current monitor with gutter {}",
-                            gutter
-                        );
-                        println!("Current monitor info: {:?}", current_monitor_info);
-                        current_monitor
-                    }
-                    &Action::LeftHalf
-                    | &Action::RightHalf
-                    | &Action::TopHalf
-                    | &Action::BottomHalf => {
-                        // For halves, stay on current monitor
-                        println!("Snapping to half on current monitor");
-                        current_monitor
-                    }
-                };
-
-                let target_monitor_info = &monitors[target_monitor];
-
-                // Calculate current window dimensions
-                let current_width = rect.right - rect.left;
-                let current_height = rect.bottom - rect.top;
-
-                // Calculate current monitor work area dimensions
-                let current_work_width =
-                    current_monitor_info.work_right - current_monitor_info.work_left;
-                let current_work_height =
-                    current_monitor_info.work_bottom - current_monitor_info.work_top;
-
-                // Calculate target monitor work area dimensions
-                let target_work_width =
-                    target_monitor_info.work_right - target_monitor_info.work_left;
-                let target_work_height =
-                    target_monitor_info.work_bottom - target_monitor_info.work_top;
-
-                // Calculate relative position within current monitor work area (as percentages)
-                let relative_x = (window_center_x - current_monitor_info.work_left) as f32
-                    / current_work_width as f32;
-                let relative_y = (window_center_y - current_monitor_info.work_top) as f32
-                    / current_work_height as f32;
-
-                // Calculate new dimensions and position based on action
-                let (new_width, new_height, new_x, new_y) =
-                    match action.as_ref().unwrap_or(&Action::None) {
-                        &Action::Maximize { gutter } => {
-                            // Get the monitor info for proper work area
-                            let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-                            let mut monitor_info: MONITORINFO = std::mem::zeroed();
-                            monitor_info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
-
-                            if GetMonitorInfoW(monitor, &mut monitor_info) == 0 {
-                                return Err("Failed to get monitor info".to_string());
-                            }
-
-                            // Use the actual work area from monitor info
-                            let work_area = monitor_info.rcWork;
-                            let dpi = GetDpiForWindow(hwnd);
-                            let dpi_scale = dpi as f32 / 96.0; // 96 is the default DPI
-
-                            // Get the extended frame bounds first to understand current shadow size
-                            let mut window_rect = std::mem::zeroed();
-                            let mut extended_frame: RECT = std::mem::zeroed();
-                            if GetWindowRect(hwnd, &mut window_rect) == 0
-                                || DwmGetWindowAttribute(
-                                    hwnd,
-                                    DWMWA_EXTENDED_FRAME_BOUNDS,
-                                    &mut extended_frame as *mut RECT as *mut _,
-                                    std::mem::size_of::<RECT>() as u32,
-                                ) != 0
-                            {
-                                return Err("Failed to get window metrics".to_string());
-                            }
-
-                            // Calculate shadow offsets
-                            let shadow_left = extended_frame.left - window_rect.left;
-                            let shadow_top = extended_frame.top - window_rect.top;
-                            let shadow_right = window_rect.right - extended_frame.right;
-                            let shadow_bottom = window_rect.bottom - extended_frame.bottom;
-
-                            // Calculate dimensions accounting for DPI and gutter
-                            let scaled_gutter = (gutter as f32 * dpi_scale) as i32;
-                            let work_width = work_area.right - work_area.left;
-                            let work_height = work_area.bottom - work_area.top;
-
-                            println!(
-                                "Work area: {}x{} at ({},{})",
-                                work_width, work_height, work_area.left, work_area.top
-                            );
-                            println!(
-                                "Shadow offsets: left={}, top={}, right={}, bottom={}",
-                                shadow_left, shadow_top, shadow_right, shadow_bottom
-                            );
-
-                            // Adjust for shadow offsets to ensure the visible window fills the space
-                            let adjusted_width =
-                                work_width - (scaled_gutter * 2) + shadow_left + shadow_right;
-                            let adjusted_height =
-                                work_height - (scaled_gutter * 2) + shadow_top + shadow_bottom;
-
-                            println!(
-                                "Adjusted window dimensions: {}x{} at ({},{})",
-                                adjusted_width,
-                                adjusted_height,
-                                work_area.left + scaled_gutter - shadow_left,
-                                work_area.top + scaled_gutter - shadow_top
-                            );
-
-                            (
-                                adjusted_width,
-                                adjusted_height,
-                                work_area.left + scaled_gutter - shadow_left,
-                                work_area.top + scaled_gutter - shadow_top,
-                            )
-                        }
-                        &Action::LeftHalf => {
-                            // Snap to left half of the monitor
-                            let new_width = target_work_width / 2;
-                            let new_height = target_work_height;
-                            let new_x = target_monitor_info.work_left;
-                            let new_y = target_monitor_info.work_top;
-
-                            println!(
-                                "Snapping to left half: {}x{} at ({},{})",
-                                new_width, new_height, new_x, new_y
-                            );
-                            (new_width, new_height, new_x, new_y)
-                        }
-                        &Action::RightHalf => {
-                            // Snap to right half of the monitor
-                            let new_width = target_work_width / 2;
-                            let new_height = target_work_height;
-                            let new_x = target_monitor_info.work_left + target_work_width / 2;
-                            let new_y = target_monitor_info.work_top;
-
-                            println!(
-                                "Snapping to right half: {}x{} at ({},{})",
-                                new_width, new_height, new_x, new_y
-                            );
-                            (new_width, new_height, new_x, new_y)
-                        }
-                        &Action::TopHalf => {
-                            // Snap to top half of the monitor
-                            let new_width = target_work_width;
-                            let new_height = target_work_height / 2;
-                            let new_x = target_monitor_info.work_left;
-                            let new_y = target_monitor_info.work_top;
-
-                            println!(
-                                "Snapping to top half: {}x{} at ({},{})",
-                                new_width, new_height, new_x, new_y
-                            );
-                            (new_width, new_height, new_x, new_y)
-                        }
-                        &Action::BottomHalf => {
-                            // Snap to bottom half of the monitor
-                            let new_width = target_work_width;
-                            let new_height = target_work_height / 2;
-                            let new_x = target_monitor_info.work_left;
-                            let new_y = target_monitor_info.work_top + target_work_height / 2;
-
-                            println!(
-                                "Snapping to bottom half: {}x{} at ({},{})",
-                                new_width, new_height, new_x, new_y
-                            );
-                            (new_width, new_height, new_x, new_y)
-                        }
-                        _ => {
-                            // For other actions, maintain aspect ratio if possible
-                            let width_percentage = current_width as f32 / current_work_width as f32;
-                            let height_percentage =
-                                current_height as f32 / current_work_height as f32;
-
-                            let new_width = (target_work_width as f32 * width_percentage)
-                                .min(target_work_width as f32)
-                                as i32;
-                            let new_height = (target_work_height as f32 * height_percentage)
-                                .min(target_work_height as f32)
-                                as i32;
-
-                            // Calculate new center position
-                            let new_center_x = target_monitor_info.work_left
-                                + (target_work_width as f32 * relative_x) as i32;
-                            let new_center_y = target_monitor_info.work_top
-                                + (target_work_height as f32 * relative_y) as i32;
-
-                            // Calculate final window position ensuring it stays within work area bounds
-                            let new_x = (new_center_x - new_width / 2)
-                                .max(target_monitor_info.work_left)
-                                .min(target_monitor_info.work_right - new_width);
-                            let new_y = (new_center_y - new_height / 2)
-                                .max(target_monitor_info.work_top)
-                                .min(target_monitor_info.work_bottom - new_height);
-
-                            (new_width, new_height, new_x, new_y)
-                        }
-                    };
-
-                let result = SetWindowPos(
-                    hwnd,
-                    ptr::null_mut(),
-                    new_x,
-                    new_y,
-                    new_width,
-                    new_height,
-                    SWP_FRAMECHANGED, // Force frame recalculation
-                );
-                if result != 0 {
-                    println!("Window moved successfully");
-                    Ok(())
-                } else {
-                    let error = "Failed to move/resize window".to_string();
-                    println!("Error: {}", error);
-                    Err(error)
-                }
+                Ok(())
             } else {
-                Err("No focused window found".to_string())
+                Err("Failed to move/resize window".to_string())
             }
         }
     }
@@ -486,7 +243,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(ShortcutManager::new(shortcuts_config.clone()))
-        .invoke_handler(tauri::generate_handler![update_shortcut])
+        .invoke_handler(tauri::generate_handler![move_window, update_shortcut])
         .setup({
             let shortcuts_config = shortcuts_config.clone();
             move |app| {
