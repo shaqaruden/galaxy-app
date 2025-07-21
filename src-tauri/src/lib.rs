@@ -61,6 +61,10 @@ enum Action {
     RightHalf,
     TopHalf,
     BottomHalf,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
     None,
 }
 
@@ -74,6 +78,10 @@ impl Action {
             Action::RightHalf => Box::new(RightHalfAction),
             Action::TopHalf => Box::new(TopHalfAction),
             Action::BottomHalf => Box::new(BottomHalfAction),
+            Action::TopLeft => Box::new(TopLeftAction),
+            Action::TopRight => Box::new(TopRightAction),
+            Action::BottomLeft => Box::new(BottomLeftAction),
+            Action::BottomRight => Box::new(BottomRightAction),
             _ => Box::new(NoOpAction),
         }
     }

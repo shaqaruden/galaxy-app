@@ -301,6 +301,10 @@ pub fn register_shortcuts(
                 let right_half = config.get_shortcut("rightHalf").map(|s| s.default_shortcut.clone()).unwrap_or_default();
                 let top_half = config.get_shortcut("topHalf").map(|s| s.default_shortcut.clone()).unwrap_or_default();
                 let bottom_half = config.get_shortcut("bottomHalf").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                let top_left = config.get_shortcut("topLeft").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                let top_right = config.get_shortcut("topRight").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                let bottom_left = config.get_shortcut("bottomLeft").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                let bottom_right = config.get_shortcut("bottomRight").map(|s| s.default_shortcut.clone()).unwrap_or_default();
 
                 let normalized_move_left = normalize_shortcut(&move_left);
                 let normalized_move_right = normalize_shortcut(&move_right);
@@ -310,11 +314,17 @@ pub fn register_shortcuts(
                 let normalized_right_half = normalize_shortcut(&right_half);
                 let normalized_top_half = normalize_shortcut(&top_half);
                 let normalized_bottom_half = normalize_shortcut(&bottom_half);
+                let normalized_top_left = normalize_shortcut(&top_left);
+                let normalized_top_right = normalize_shortcut(&top_right);
+                let normalized_bottom_left = normalize_shortcut(&bottom_left);
+                let normalized_bottom_right = normalize_shortcut(&bottom_right);
 
                 println!("Comparing against - MoveLeft: {}, MoveRight: {}, Maximize: {}, AlmostMaximize: {}",
                     normalized_move_left, normalized_move_right, normalized_maximize, normalized_almost_maximize);
                 println!("Comparing against - LeftHalf: {}, RightHalf: {}, TopHalf: {}, BottomHalf: {}",
                     normalized_left_half, normalized_right_half, normalized_top_half, normalized_bottom_half);
+                println!("Comparing against - TopLeft: {}, TopRight: {}, BottomLeft: {}, BottomRight: {}",
+                    normalized_top_left, normalized_top_right, normalized_bottom_left, normalized_bottom_right);
 
                 match normalized_shortcut.as_str() {
                     _ if normalized_shortcut == normalized_move_left => {
@@ -348,6 +358,22 @@ pub fn register_shortcuts(
                     _ if normalized_shortcut == normalized_bottom_half => {
                         println!("Triggering BottomHalf action");
                         let _ = super::move_window(Some(Action::BottomHalf));
+                    }
+                    _ if normalized_shortcut == normalized_top_left => {
+                        println!("Triggering TopLeft action");
+                        let _ = super::move_window(Some(Action::TopLeft));
+                    }
+                    _ if normalized_shortcut == normalized_top_right => {
+                        println!("Triggering TopRight action");
+                        let _ = super::move_window(Some(Action::TopRight));
+                    }
+                    _ if normalized_shortcut == normalized_bottom_left => {
+                        println!("Triggering BottomLeft action");
+                        let _ = super::move_window(Some(Action::BottomLeft));
+                    }
+                    _ if normalized_shortcut == normalized_bottom_right => {
+                        println!("Triggering BottomRight action");
+                        let _ = super::move_window(Some(Action::BottomRight));
                     }
                     _ => {
                         println!("No action found for shortcut: {}", shortcut_str);
