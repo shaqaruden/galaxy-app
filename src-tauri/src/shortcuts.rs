@@ -6,6 +6,8 @@ use std::str::FromStr;
 use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 // Helper function to normalize shortcut strings for comparison
 fn normalize_shortcut(shortcut: &str) -> String {
@@ -337,27 +339,83 @@ pub fn register_shortcuts(
     // Register individual shortcuts
     {
         let config = shortcuts_state.lock().unwrap();
+        let mut registered_shortcuts = std::collections::HashSet::new();
+        let mut errors = Vec::new();
+        
         for (id, shortcut_cfg) in config.get_all_shortcuts() {
             match Shortcut::from_str(&shortcut_cfg.default_shortcut) {
                 Ok(shortcut) => {
+                    let shortcut_str = shortcut.to_string();
+                    
+                    // Check if this exact shortcut was already registered
+                    if registered_shortcuts.contains(&shortcut_str) {
+                        let warning = format!(
+                            "Warning: Duplicate shortcut '{}' for '{}' - skipping",
+                            shortcut_str, id
+                        );
+                        println!("{}", warning);
+                        continue;
+                    }
+                    
                     println!(
                         "Registering global shortcut: {} for {}",
                         shortcut_cfg.default_shortcut, id
                     );
-                    if let Err(e) = app_handle.global_shortcut().register(shortcut) {
-                        return Err(format!(
-                            "Failed to register shortcut '{}': {}",
-                            shortcut_cfg.default_shortcut, e
-                        ));
+                    
+                    // Use catch_unwind to handle any panics during registration
+                    let registration_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        app_handle.global_shortcut().register(shortcut)
+                    }));
+                    
+                    match registration_result {
+                        Ok(Ok(_)) => {
+                            registered_shortcuts.insert(shortcut_str);
+                        }
+                        Ok(Err(e)) => {
+                            let error_msg = format!(
+                                "Failed to register shortcut '{}' for '{}': {}",
+                                shortcut_cfg.default_shortcut, id, e
+                            );
+                            eprintln!("{}", error_msg);
+                            errors.push(error_msg);
+                        }
+                        Err(_) => {
+                            let error_msg = format!(
+                                "Panic while registering shortcut '{}' for '{}' (likely already registered by another application)",
+                                shortcut_cfg.default_shortcut, id
+                            );
+                            eprintln!("{}", error_msg);
+                            errors.push(error_msg);
+                        }
                     }
                 }
                 Err(e) => {
-                    return Err(format!(
+                    let error_msg = format!(
                         "Invalid shortcut format for '{}' (value: '{}'): {}",
                         id, shortcut_cfg.default_shortcut, e
-                    ));
+                    );
+                    eprintln!("{}", error_msg);
+                    errors.push(error_msg);
                 }
             }
+        }
+        
+        // Handle any registration errors
+        if !errors.is_empty() {
+            let error_message = format!(
+                "{} shortcuts couldn't be registered and have been disabled.\n\n{}",
+                errors.len(),
+                errors.join("\n")
+            );
+            
+            // Log the error
+            eprintln!("Warning: {}", error_message);
+        }
+        
+        // If we didn't register any shortcuts at all, that's an error
+        if registered_shortcuts.is_empty() {
+            let error_msg = "Failed to register any shortcuts. All shortcut registrations failed.";
+            return Err(error_msg.to_string());
         }
     }
 

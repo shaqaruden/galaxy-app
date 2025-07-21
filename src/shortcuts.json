@@ -1,20 +1,90 @@
 {
-  "shortcuts": {
-    "almostMaximizeWindow": {
-      "name": "Almost Maximize Window",
-      "defaultShortcut": "Control+Alt+Shift+Enter"
-    },
-    "moveMonitorLeft": {
-      "name": "Move to Left Monitor",
-      "defaultShortcut": "Control+Alt+Shift+ArrowLeft"
-    },
-    "maximizeWindow": {
-      "name": "Maximize Window",
-      "defaultShortcut": "Control+Alt+Enter"
-    },
-    "moveMonitorRight": {
-      "name": "Move to Right Monitor",
-      "defaultShortcut": "Control+Alt+Shift+ArrowRight"
-    }
+  "leftHalf": {
+    "name": "Snap to Left Half",
+    "defaultShortcut": "Control+Alt+ArrowLeft"
+  },
+  "rightHalf": {
+    "name": "Snap to Right Half",
+    "defaultShortcut": "Control+Alt+ArrowRight"
+  },
+  "topHalf": {
+    "name": "Snap to Top Half",
+    "defaultShortcut": "Control+Alt+ArrowUp"
+  },
+  "bottomHalf": {
+    "name": "Snap to Bottom Half",
+    "defaultShortcut": "Control+Alt+ArrowDown"
+  },
+  "topLeft": {
+    "name": "Snap to Top Left",
+    "defaultShortcut": "Control+Alt+U"
+  },
+  "topRight": {
+    "name": "Snap to Top Right",
+    "defaultShortcut": "Control+Alt+I"
+  },
+  "bottomLeft": {
+    "name": "Snap to Bottom Left",
+    "defaultShortcut": "Control+Alt+J"
+  },
+  "bottomRight": {
+    "name": "Snap to Bottom Right",
+    "defaultShortcut": "Control+Alt+K"
+  },
+  "maximizeWindow": {
+    "name": "Maximize Window",
+    "defaultShortcut": "Control+Alt+Enter"
+  },
+  "almostMaximizeWindow": {
+    "name": "Almost Maximize Window",
+    "defaultShortcut": "Shift+Control+Alt+Enter"
+  },
+  "maximizeHeight": {
+    "name": "Maximize Height",
+    "defaultShortcut": "Shift+Control+Alt+ArrowUp"
+  },
+  "makeSmaller": {
+    "name": "Make Window Smaller",
+    "defaultShortcut": "Control+Alt+Minus"
+  },
+  "makeLarger": {
+    "name": "Make Window Larger",
+    "defaultShortcut": "Control+Alt+="
+  },
+  "center": {
+    "name": "Center Window",
+    "defaultShortcut": "Control+Alt+C"
+  },
+  "restore": {
+    "name": "Restore Window",
+    "defaultShortcut": "Control+Alt+Backspace"
+  },
+  "moveMonitorLeft": {
+    "name": "Move to Left Monitor",
+    "defaultShortcut": "Shift+Control+Alt+ArrowLeft"
+  },
+  "moveMonitorRight": {
+    "name": "Move to Right Monitor",
+    "defaultShortcut": "Shift+Control+Alt+ArrowRight"
+  },
+  "firstThird": {
+    "name": "Snap to First Third",
+    "defaultShortcut": "Control+Alt+D"
+  },
+  "centerThird": {
+    "name": "Snap to Center Third",
+    "defaultShortcut": "Control+Alt+F"
+  },
+  "lastThird": {
+    "name": "Snap to Last Third",
+    "defaultShortcut": "Control+Alt+G"
+  },
+  "firstTwoThirds": {
+    "name": "Snap to First Two Thirds",
+    "defaultShortcut": "Control+Alt+E"
+  },
+  "lastTwoThirds": {
+    "name": "Snap to Last Two Thirds",
+    "defaultShortcut": "Control+Alt+T"
   }
 }

@@ -9,7 +9,6 @@ use shortcuts::{update_shortcut, ShortcutManager};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Manager,
 };
 use winapi::um::winuser::{EnumDisplayMonitors, GetMonitorInfoW, MONITORINFO, MONITORINFOEXW};
 use window_vibrancy::apply_mica;
