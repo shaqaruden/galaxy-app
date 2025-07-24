@@ -65,6 +65,11 @@ enum Action {
     TopRight,
     BottomLeft,
     BottomRight,
+    FirstThird,
+    CenterThird,
+    LastThird,
+    FirstTwoThirds,
+    LastTwoThirds,
     None,
 }
 
@@ -82,6 +87,11 @@ impl Action {
             Action::TopRight => Box::new(TopRightAction),
             Action::BottomLeft => Box::new(BottomLeftAction),
             Action::BottomRight => Box::new(BottomRightAction),
+            Action::FirstThird => Box::new(FirstThirdAction),
+            Action::CenterThird => Box::new(CenterThirdAction),
+            Action::LastThird => Box::new(LastThirdAction),
+            Action::FirstTwoThirds => Box::new(FirstTwoThirdsAction),
+            Action::LastTwoThirds => Box::new(LastTwoThirdsAction),
             _ => Box::new(NoOpAction),
         }
     }

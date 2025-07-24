@@ -305,6 +305,11 @@ pub fn register_shortcuts(
                 let top_right = config.get_shortcut("topRight").map(|s| s.default_shortcut.clone()).unwrap_or_default();
                 let bottom_left = config.get_shortcut("bottomLeft").map(|s| s.default_shortcut.clone()).unwrap_or_default();
                 let bottom_right = config.get_shortcut("bottomRight").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                let first_third = config.get_shortcut("firstThird").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                let center_third = config.get_shortcut("centerThird").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                let last_third = config.get_shortcut("lastThird").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                let first_two_thirds = config.get_shortcut("firstTwoThirds").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                let last_two_thirds = config.get_shortcut("lastTwoThirds").map(|s| s.default_shortcut.clone()).unwrap_or_default();
 
                 let normalized_move_left = normalize_shortcut(&move_left);
                 let normalized_move_right = normalize_shortcut(&move_right);
@@ -318,6 +323,11 @@ pub fn register_shortcuts(
                 let normalized_top_right = normalize_shortcut(&top_right);
                 let normalized_bottom_left = normalize_shortcut(&bottom_left);
                 let normalized_bottom_right = normalize_shortcut(&bottom_right);
+                let normalized_first_third = normalize_shortcut(&first_third);
+                let normalized_center_third = normalize_shortcut(&center_third);
+                let normalized_last_third = normalize_shortcut(&last_third);
+                let normalized_first_two_thirds = normalize_shortcut(&first_two_thirds);
+                let normalized_last_two_thirds = normalize_shortcut(&last_two_thirds);
 
                 println!("Comparing against - MoveLeft: {}, MoveRight: {}, Maximize: {}, AlmostMaximize: {}",
                     normalized_move_left, normalized_move_right, normalized_maximize, normalized_almost_maximize);
@@ -325,6 +335,10 @@ pub fn register_shortcuts(
                     normalized_left_half, normalized_right_half, normalized_top_half, normalized_bottom_half);
                 println!("Comparing against - TopLeft: {}, TopRight: {}, BottomLeft: {}, BottomRight: {}",
                     normalized_top_left, normalized_top_right, normalized_bottom_left, normalized_bottom_right);
+                println!("Comparing against - FirstThird: {}, CenterThird: {}, LastThird: {}",
+                    normalized_first_third, normalized_center_third, normalized_last_third);
+                println!("Comparing against - FirstTwoThirds: {}, LastTwoThirds: {}",
+                    normalized_first_two_thirds, normalized_last_two_thirds);
 
                 match normalized_shortcut.as_str() {
                     _ if normalized_shortcut == normalized_move_left => {
@@ -374,6 +388,26 @@ pub fn register_shortcuts(
                     _ if normalized_shortcut == normalized_bottom_right => {
                         println!("Triggering BottomRight action");
                         let _ = super::move_window(Some(Action::BottomRight));
+                    }
+                    _ if normalized_shortcut == normalized_first_third => {
+                        println!("Triggering FirstThird action");
+                        let _ = super::move_window(Some(Action::FirstThird));
+                    }
+                    _ if normalized_shortcut == normalized_center_third => {
+                        println!("Triggering CenterThird action");
+                        let _ = super::move_window(Some(Action::CenterThird));
+                    }
+                    _ if normalized_shortcut == normalized_last_third => {
+                        println!("Triggering LastThird action");
+                        let _ = super::move_window(Some(Action::LastThird));
+                    }
+                    _ if normalized_shortcut == normalized_first_two_thirds => {
+                        println!("Triggering FirstTwoThirds action");
+                        let _ = super::move_window(Some(Action::FirstTwoThirds));
+                    }
+                    _ if normalized_shortcut == normalized_last_two_thirds => {
+                        println!("Triggering LastTwoThirds action");
+                        let _ = super::move_window(Some(Action::LastTwoThirds));
                     }
                     _ => {
                         println!("No action found for shortcut: {}", shortcut_str);
