@@ -8,13 +8,15 @@ use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri::Manager;
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use crate::key_mapping;
 
 // Helper function to normalize shortcut strings for comparison
 fn normalize_shortcut(shortcut: &str) -> String {
     let canonical_order = ["shift", "control", "alt", "meta", "super", "cmd", "win"];
-    let mut parts: Vec<&str> = shortcut.split('+').collect();
+    let translated_shortcut = key_mapping::translate_shortcut(shortcut);
+    let mut parts: Vec<&str> = translated_shortcut.split('+').collect();
     if parts.len() <= 1 {
-        return shortcut.to_lowercase();
+        return translated_shortcut.to_lowercase();
     }
     let key = parts.pop().unwrap().to_lowercase();
     let mut key_norm = key.clone();

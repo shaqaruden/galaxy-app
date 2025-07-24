@@ -6,6 +6,7 @@ use std::sync::Mutex;
 
 mod shortcuts;
 mod window_actions;
+mod key_mapping;
 
 use shortcuts::{update_shortcut, ShortcutManager};
 use tauri::{

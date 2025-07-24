@@ -1164,6 +1164,7 @@ name = "galaxy"
 version = "0.1.0"
 dependencies = [
  "directories",
+ "lazy_static",
  "once_cell",
  "serde",
  "serde_json",
