@@ -9,9 +9,10 @@ A powerful, lightweight window management utility for Windows that runs quietly 
 
 ## Known Issues
 - Some window's bounding boxes are not correctly detected, leading to gaps around certain edges of an application.
+- Need to manually setup to start with Windows.
 
 ### System Requirements
-Though is is a Tauri application, it is only available for Windows. There are other options for macOS and linux. This app was created to solve my issue of not having something to move windows around with my keyboard that worked for me.
+Though this is a Tauri application, it is only available for Windows. There are other options for macOS and linux. This app was created to solve my issue of not having something to move windows around with my keyboard that worked for me.
 
 ## Default Keyboard Shortcuts
 
