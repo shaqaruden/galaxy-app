@@ -49,7 +49,7 @@ pub struct ActionContext {
     pub window_info: WindowInfo,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Action {
     MoveLeft,
@@ -70,6 +70,9 @@ enum Action {
     LastThird,
     FirstTwoThirds,
     LastTwoThirds,
+    Center,
+    MakeLarger,
+    MakeSmaller,
     None,
 }
 
@@ -92,6 +95,9 @@ impl Action {
             Action::LastThird => Box::new(LastThirdAction),
             Action::FirstTwoThirds => Box::new(FirstTwoThirdsAction),
             Action::LastTwoThirds => Box::new(LastTwoThirdsAction),
+            Action::Center => Box::new(NoOpAction), // TODO: Implement CenterAction
+            Action::MakeLarger => Box::new(NoOpAction), // TODO: Implement MakeLargerAction
+            Action::MakeSmaller => Box::new(NoOpAction), // TODO: Implement MakeSmallerAction
             _ => Box::new(NoOpAction),
         }
     }
