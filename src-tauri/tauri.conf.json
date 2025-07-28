@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "shortcut-test",
+  "productName": "Galaxy Window Manager",
   "version": "0.1.0",
-  "identifier": "com.shortcut-test.app",
+  "identifier": "com.shaqaruden.galaxy",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",

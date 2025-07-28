@@ -22,7 +22,6 @@ import BottomRight from './components/icons/BottomRight.vue';
 import MakeSmaller from './components/icons/MakeSmaller.vue';
 import MakeLarger from './components/icons/MakeLarger.vue';
 import Center from './components/icons/Center.vue';
-import Restore from './components/icons/Restore.vue';
 import FirstThird from './components/icons/FirstThird.vue';
 import CenterThird from './components/icons/CenterThird.vue';
 import LastThird from './components/icons/LastThird.vue';
@@ -190,11 +189,6 @@ const handleShortcutSave = async ({ id, shortcut }) => {
               </template>
             </ShortcutInput>
 
-            <ShortcutInput v-model="shortcuts.restore" label="Restore" shortcut-id="restore" @save="handleShortcutSave">
-              <template #icon>
-                <Restore />
-              </template>
-            </ShortcutInput>
 
             <ShortcutInput v-model="shortcuts.moveMonitorLeft" label="Move to Left Monitor"
               shortcut-id="moveMonitorLeft" @save="handleShortcutSave">

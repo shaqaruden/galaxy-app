@@ -20,10 +20,6 @@
       "name": "Almost Maximize Window",
       "defaultShortcut": "Shift+Control+Alt+Enter"
     },
-    "restore": {
-      "name": "Restore Window",
-      "defaultShortcut": "Control+Alt+Backspace"
-    },
     "firstThird": {
       "name": "Snap to First Third",
       "defaultShortcut": "Control+Alt+O"

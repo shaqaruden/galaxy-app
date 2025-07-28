@@ -7,7 +7,7 @@ pub struct MaximizeAction {
 }
 
 impl WindowActionHandler for MaximizeAction {
-    fn calculate_position(&self, context: &ActionContext, hwnd: HWND) -> Result<(i32, i32, i32, i32), String> {
+    fn calculate_position(&self, _context: &ActionContext, hwnd: HWND) -> Result<(i32, i32, i32, i32), String> {
         use winapi::shared::windef::RECT;
         use winapi::um::dwmapi::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
         use winapi::um::winuser::{GetDpiForWindow, GetMonitorInfoW, GetWindowRect, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};

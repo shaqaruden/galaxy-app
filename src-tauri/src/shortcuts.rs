@@ -260,9 +260,6 @@ impl ShortcutsConfig {
         Ok(parsed)
     }
 
-    pub fn get_shortcut(&self, id: &str) -> Option<&ShortcutConfig> {
-        self.shortcuts.get(id)
-    }
 
     pub fn get_all_shortcuts(&self) -> &HashMap<String, ShortcutConfig> {
         &self.shortcuts

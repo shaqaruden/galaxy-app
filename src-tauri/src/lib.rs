@@ -6,7 +6,6 @@ use std::sync::Mutex;
 
 mod shortcuts;
 mod window_actions;
-mod key_mapping;
 
 use shortcuts::{update_shortcut, ShortcutManager};
 use tauri::{
@@ -16,7 +15,6 @@ use tauri::{
 };
 use winapi::um::winuser::{EnumDisplayMonitors, GetMonitorInfoW, MONITORINFO, MONITORINFOEXW};
 use window_actions::*;
-use window_vibrancy::apply_mica;
 
 // Global storage for monitor information
 static MONITORS: Lazy<Mutex<Vec<MonitorInfo>>> = Lazy::new(|| Mutex::new(Vec::new()));
@@ -56,8 +54,6 @@ pub struct ActionContext {
 enum Action {
     MoveLeft,
     MoveRight,
-    MoveUp,
-    MoveDown,
     Maximize { gutter: i32 },
     LeftHalf,
     RightHalf,

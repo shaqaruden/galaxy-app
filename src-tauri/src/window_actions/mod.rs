@@ -3,7 +3,7 @@ use winapi::shared::windef::HWND;
 
 pub trait WindowActionHandler {
     /// Determines which monitor the window should be moved to
-    fn get_target_monitor(&self, current_monitor: usize, monitors: &[MonitorInfo]) -> usize {
+    fn get_target_monitor(&self, current_monitor: usize, _monitors: &[MonitorInfo]) -> usize {
         // Default: stay on current monitor
         current_monitor
     }
