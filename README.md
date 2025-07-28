@@ -1,7 +1,7 @@
 <p align="center">
   <img src="./src-tauri/icons/Square150x150Logo.png" />
-  <h1 style="text-align: center;">Galaxy Window Manager</h1>
-  <p style="text-align: center;">*Application name and icon are temporary.*</p>
+  <h1 align="center">Galaxy Window Manager</h1>
+  <p align="center">*Application name and icon are temporary.*</p>
 </p>
 
 
