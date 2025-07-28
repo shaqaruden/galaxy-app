@@ -334,6 +334,7 @@ pub fn register_shortcuts(
                         "center" => Some(Action::Center),
                         "makeLarger" => Some(Action::MakeLarger),
                         "makeSmaller" => Some(Action::MakeSmaller),
+                        "maximizeHeight" => Some(Action::MaximizeHeight),
                         _ => None,
                     };
                     

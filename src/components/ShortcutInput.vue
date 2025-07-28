@@ -1,15 +1,12 @@
 <template>
   <v-text-field :model-value="displayValue" variant="outlined" density="compact" :label="label"
     :placeholder="isRecording ? 'Press a key combination...' : 'Record Shortcut'" :readonly="!isRecording" hide-details
-    @keydown.prevent="handleKeyDown" @keyup="handleKeyUp" @blur="handleBlur" append-inner-icon="mdi-keyboard"
-    @click:append-inner.stop="toggleRecording" ref="inputRef">
+    @keydown.prevent="handleKeyDown" @keyup="handleKeyUp" @blur="handleBlur"
+    :append-inner-icon="isRecording ? 'mdi-close' : 'mdi-keyboard'" @click:append-inner.stop="toggleRecording"
+    ref="inputRef" color="primary">
     <template v-slot:prepend-inner>
       <slot name="icon"></slot>
     </template>
-    <!-- <template v-slot:append-inner>
-      <v-btn :icon="isRecording ? 'mdi-check' : 'mdi-keyboard'" :color="isRecording ? 'success' : undefined"
-        @click.stop="toggleRecording" :loading="isSaving" :disabled="isSaving"></v-btn>
-    </template> -->
   </v-text-field>
 </template>
 

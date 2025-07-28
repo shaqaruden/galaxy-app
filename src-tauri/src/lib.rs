@@ -73,6 +73,7 @@ enum Action {
     Center,
     MakeLarger,
     MakeSmaller,
+    MaximizeHeight,
     None,
 }
 
@@ -95,9 +96,10 @@ impl Action {
             Action::LastThird => Box::new(LastThirdAction),
             Action::FirstTwoThirds => Box::new(FirstTwoThirdsAction),
             Action::LastTwoThirds => Box::new(LastTwoThirdsAction),
-            Action::Center => Box::new(NoOpAction), // TODO: Implement CenterAction
-            Action::MakeLarger => Box::new(NoOpAction), // TODO: Implement MakeLargerAction
-            Action::MakeSmaller => Box::new(NoOpAction), // TODO: Implement MakeSmallerAction
+            Action::Center => Box::new(CenterAction),
+            Action::MakeLarger => Box::new(MakeLargerAction),
+            Action::MakeSmaller => Box::new(MakeSmallerAction),
+            Action::MaximizeHeight => Box::new(MaximizeHeightAction),
             _ => Box::new(NoOpAction),
         }
     }
