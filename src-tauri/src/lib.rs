@@ -12,6 +12,7 @@ use shortcuts::{update_shortcut, ShortcutManager};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
+    Manager, AppHandle,
 };
 use winapi::um::winuser::{EnumDisplayMonitors, GetMonitorInfoW, MONITORINFO, MONITORINFOEXW};
 use window_actions::*;
@@ -261,6 +262,25 @@ unsafe extern "system" fn enum_monitor_callback(
     1 // Continue enumeration
 }
 
+#[tauri::command]
+fn toggle_window(app: AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        match window.is_visible() {
+            Ok(true) => {
+                let _ = window.hide();
+            },
+            Ok(false) => {
+                let _ = window.show();
+                let _ = window.set_focus();
+            },
+            Err(_) => {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }
+    }
+}
+
 pub fn run() {
     // Create the shared shortcut config ONCE
     let shortcuts_config = Arc::new(Mutex::new(
@@ -270,10 +290,49 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(ShortcutManager::new(shortcuts_config.clone()))
-        .invoke_handler(tauri::generate_handler![move_window, update_shortcut])
+        .invoke_handler(tauri::generate_handler![move_window, update_shortcut, toggle_window])
+        .on_window_event(|window, event| {
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    // Hide instead of closing
+                    window.hide().unwrap();
+                    api.prevent_close();
+                }
+                _ => {}
+            }
+        })
         .setup({
             let shortcuts_config = shortcuts_config.clone();
             move |app| {
+                // Create tray menu
+                let open_settings = MenuItem::with_id(app, "open_settings", "Open Settings", true, None::<&str>)?;
+                let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+                let menu = Menu::with_items(app, &[&open_settings, &quit])?;
+
+                // Create system tray
+                let _tray = TrayIconBuilder::with_id("main_tray")
+                    .icon(app.default_window_icon().unwrap().clone())
+                    .menu(&menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(move |app, event| match event.id.as_ref() {
+                        "open_settings" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    })
+                    .build(app)?;
+
+                // Hide window on startup (start minimized to tray)
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+
                 #[cfg(desktop)]
                 {
                     // Register all shortcuts

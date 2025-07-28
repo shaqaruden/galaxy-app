@@ -41,10 +41,10 @@ onMounted(() => {
   shortcuts.value = shortcutsFromConfig;
 });
 
-// Handle window close
+// Handle window close - hide instead of closing to keep app in tray
 async function closeWindow() {
   const window = await getCurrentWindow();
-  await window.close();
+  await window.hide();
 }
 
 // Handle shortcut save
