@@ -1,22 +1,33 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
 use std::str::FromStr;
 use std::sync::Mutex;
 use tauri::AppHandle;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
-use tauri::Manager;
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
-use crate::key_mapping;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+
+// Helper function to translate symbol keys to their system names
+fn translate_key_symbols(shortcut: &str) -> String {
+    shortcut
+        .replace("=", "Equal")
+        .replace("-", "Minus")
+        .replace("[", "BracketLeft")
+        .replace("]", "BracketRight")
+        .replace(";", "Semicolon")
+        .replace("'", "Quote")
+        .replace(",", "Comma")
+        .replace(".", "Period")
+        .replace("/", "Slash")
+        .replace("\\", "Backslash")
+        .replace("`", "Backquote")
+}
 
 // Helper function to normalize shortcut strings for comparison
 fn normalize_shortcut(shortcut: &str) -> String {
     let canonical_order = ["shift", "control", "alt", "meta", "super", "cmd", "win"];
-    let translated_shortcut = key_mapping::translate_shortcut(shortcut);
-    let mut parts: Vec<&str> = translated_shortcut.split('+').collect();
+    let mut parts: Vec<&str> = shortcut.split('+').collect();
     if parts.len() <= 1 {
-        return translated_shortcut.to_lowercase();
+        return shortcut.to_lowercase();
     }
     let key = parts.pop().unwrap().to_lowercase();
     let mut key_norm = key.clone();
@@ -74,8 +85,8 @@ pub async fn update_shortcut(
         let old_shortcut_str = shortcut_cfg.default_shortcut.clone();
 
         // Normalize both shortcuts for comparison
-        let normalized_old = normalize_shortcut(&old_shortcut_str);
-        let normalized_new = normalize_shortcut(&new_shortcut);
+        let normalized_old = normalize_shortcut(&translate_key_symbols(&old_shortcut_str));
+        let normalized_new = normalize_shortcut(&translate_key_symbols(&new_shortcut));
 
         println!("Old shortcut: {}", normalized_old);
         println!("New shortcut: {}", normalized_new);
@@ -93,7 +104,8 @@ pub async fn update_shortcut(
         shortcut_cfg.default_shortcut = new_shortcut.clone();
 
         // Parse the new shortcut first to validate it
-        let new_shortcut_parsed = match Shortcut::from_str(&normalized_new) {
+        let translated_new_shortcut = translate_key_symbols(&new_shortcut);
+        let new_shortcut_parsed = match Shortcut::from_str(&translated_new_shortcut) {
             Ok(s) => s,
             Err(e) => {
                 let error = format!("Invalid shortcut format: {} - {}", new_shortcut, e);
@@ -240,12 +252,12 @@ impl ShortcutsConfig {
 
         println!("Raw JSON content: {}", config_content);
 
-        let shortcuts: HashMap<String, ShortcutConfig> = serde_json::from_str(&config_content)
+        let parsed: ShortcutsConfig = serde_json::from_str(&config_content)
             .map_err(|e| format!("Failed to parse shortcuts.json: {}", e))?;
 
-        println!("Successfully parsed {} shortcuts", shortcuts.len());
+        println!("Successfully parsed {} shortcuts", parsed.shortcuts.len());
 
-        Ok(ShortcutsConfig { shortcuts })
+        Ok(parsed)
     }
 
     pub fn get_shortcut(&self, id: &str) -> Option<&ShortcutConfig> {
@@ -295,125 +307,51 @@ pub fn register_shortcuts(
             if event.state() == ShortcutState::Released {
                 // Lock and get the latest shortcuts mapping
                 let config = handler_shortcuts_state.lock().unwrap();
-                let move_left = config.get_shortcut("moveMonitorLeft").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let move_right = config.get_shortcut("moveMonitorRight").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let maximize = config.get_shortcut("maximizeWindow").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let almost_maximize = config.get_shortcut("almostMaximizeWindow").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let left_half = config.get_shortcut("leftHalf").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let right_half = config.get_shortcut("rightHalf").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let top_half = config.get_shortcut("topHalf").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let bottom_half = config.get_shortcut("bottomHalf").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let top_left = config.get_shortcut("topLeft").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let top_right = config.get_shortcut("topRight").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let bottom_left = config.get_shortcut("bottomLeft").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let bottom_right = config.get_shortcut("bottomRight").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let first_third = config.get_shortcut("firstThird").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let center_third = config.get_shortcut("centerThird").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let last_third = config.get_shortcut("lastThird").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let first_two_thirds = config.get_shortcut("firstTwoThirds").map(|s| s.default_shortcut.clone()).unwrap_or_default();
-                let last_two_thirds = config.get_shortcut("lastTwoThirds").map(|s| s.default_shortcut.clone()).unwrap_or_default();
+                
+                // Create a mapping of normalized shortcuts to actions
+                let mut shortcut_to_action = std::collections::HashMap::new();
+                
+                for (id, shortcut_cfg) in config.get_all_shortcuts() {
+                    let normalized = normalize_shortcut(&translate_key_symbols(&shortcut_cfg.default_shortcut));
+                    let action = match id.as_str() {
+                        "moveMonitorLeft" => Some(Action::MoveLeft),
+                        "moveMonitorRight" => Some(Action::MoveRight),
+                        "maximizeWindow" => Some(Action::Maximize { gutter: 0 }),
+                        "almostMaximizeWindow" => Some(Action::Maximize { gutter: 32 }),
+                        "leftHalf" => Some(Action::LeftHalf),
+                        "rightHalf" => Some(Action::RightHalf),
+                        "topHalf" => Some(Action::TopHalf),
+                        "bottomHalf" => Some(Action::BottomHalf),
+                        "topLeft" => Some(Action::TopLeft),
+                        "topRight" => Some(Action::TopRight),
+                        "bottomLeft" => Some(Action::BottomLeft),
+                        "bottomRight" => Some(Action::BottomRight),
+                        "firstThird" => Some(Action::FirstThird),
+                        "centerThird" => Some(Action::CenterThird),
+                        "lastThird" => Some(Action::LastThird),
+                        "firstTwoThirds" => Some(Action::FirstTwoThirds),
+                        "lastTwoThirds" => Some(Action::LastTwoThirds),
+                        "center" => Some(Action::Center),
+                        "makeLarger" => Some(Action::MakeLarger),
+                        "makeSmaller" => Some(Action::MakeSmaller),
+                        "maximizeHeight" => Some(Action::MaximizeHeight),
+                        _ => None,
+                    };
+                    
+                    if let Some(action) = action {
+                        shortcut_to_action.insert(normalized, (id.clone(), action));
+                    }
+                }
 
-                let normalized_move_left = normalize_shortcut(&move_left);
-                let normalized_move_right = normalize_shortcut(&move_right);
-                let normalized_maximize = normalize_shortcut(&maximize);
-                let normalized_almost_maximize = normalize_shortcut(&almost_maximize);
-                let normalized_left_half = normalize_shortcut(&left_half);
-                let normalized_right_half = normalize_shortcut(&right_half);
-                let normalized_top_half = normalize_shortcut(&top_half);
-                let normalized_bottom_half = normalize_shortcut(&bottom_half);
-                let normalized_top_left = normalize_shortcut(&top_left);
-                let normalized_top_right = normalize_shortcut(&top_right);
-                let normalized_bottom_left = normalize_shortcut(&bottom_left);
-                let normalized_bottom_right = normalize_shortcut(&bottom_right);
-                let normalized_first_third = normalize_shortcut(&first_third);
-                let normalized_center_third = normalize_shortcut(&center_third);
-                let normalized_last_third = normalize_shortcut(&last_third);
-                let normalized_first_two_thirds = normalize_shortcut(&first_two_thirds);
-                let normalized_last_two_thirds = normalize_shortcut(&last_two_thirds);
+                
+                println!("Available shortcuts: {:?}", shortcut_to_action.keys().collect::<Vec<_>>());
 
-                println!("Comparing against - MoveLeft: {}, MoveRight: {}, Maximize: {}, AlmostMaximize: {}",
-                    normalized_move_left, normalized_move_right, normalized_maximize, normalized_almost_maximize);
-                println!("Comparing against - LeftHalf: {}, RightHalf: {}, TopHalf: {}, BottomHalf: {}",
-                    normalized_left_half, normalized_right_half, normalized_top_half, normalized_bottom_half);
-                println!("Comparing against - TopLeft: {}, TopRight: {}, BottomLeft: {}, BottomRight: {}",
-                    normalized_top_left, normalized_top_right, normalized_bottom_left, normalized_bottom_right);
-                println!("Comparing against - FirstThird: {}, CenterThird: {}, LastThird: {}",
-                    normalized_first_third, normalized_center_third, normalized_last_third);
-                println!("Comparing against - FirstTwoThirds: {}, LastTwoThirds: {}",
-                    normalized_first_two_thirds, normalized_last_two_thirds);
-
-                match normalized_shortcut.as_str() {
-                    _ if normalized_shortcut == normalized_move_left => {
-                        println!("Triggering MoveLeft action");
-                        let _ = super::move_window(Some(Action::MoveLeft));
-                    }
-                    _ if normalized_shortcut == normalized_move_right => {
-                        println!("Triggering MoveRight action");
-                        let _ = super::move_window(Some(Action::MoveRight));
-                    }
-                    _ if normalized_shortcut == normalized_maximize => {
-                        println!("Triggering Maximize action");
-                        let _ = super::move_window(Some(Action::Maximize { gutter: 0 }));
-                    }
-                    _ if normalized_shortcut == normalized_almost_maximize => {
-                        println!("Triggering AlmostMaximize action");
-                        let _ = super::move_window(Some(Action::Maximize { gutter: 32 }));
-                    }
-                    _ if normalized_shortcut == normalized_left_half => {
-                        println!("Triggering LeftHalf action");
-                        let _ = super::move_window(Some(Action::LeftHalf));
-                    }
-                    _ if normalized_shortcut == normalized_right_half => {
-                        println!("Triggering RightHalf action");
-                        let _ = super::move_window(Some(Action::RightHalf));
-                    }
-                    _ if normalized_shortcut == normalized_top_half => {
-                        println!("Triggering TopHalf action");
-                        let _ = super::move_window(Some(Action::TopHalf));
-                    }
-                    _ if normalized_shortcut == normalized_bottom_half => {
-                        println!("Triggering BottomHalf action");
-                        let _ = super::move_window(Some(Action::BottomHalf));
-                    }
-                    _ if normalized_shortcut == normalized_top_left => {
-                        println!("Triggering TopLeft action");
-                        let _ = super::move_window(Some(Action::TopLeft));
-                    }
-                    _ if normalized_shortcut == normalized_top_right => {
-                        println!("Triggering TopRight action");
-                        let _ = super::move_window(Some(Action::TopRight));
-                    }
-                    _ if normalized_shortcut == normalized_bottom_left => {
-                        println!("Triggering BottomLeft action");
-                        let _ = super::move_window(Some(Action::BottomLeft));
-                    }
-                    _ if normalized_shortcut == normalized_bottom_right => {
-                        println!("Triggering BottomRight action");
-                        let _ = super::move_window(Some(Action::BottomRight));
-                    }
-                    _ if normalized_shortcut == normalized_first_third => {
-                        println!("Triggering FirstThird action");
-                        let _ = super::move_window(Some(Action::FirstThird));
-                    }
-                    _ if normalized_shortcut == normalized_center_third => {
-                        println!("Triggering CenterThird action");
-                        let _ = super::move_window(Some(Action::CenterThird));
-                    }
-                    _ if normalized_shortcut == normalized_last_third => {
-                        println!("Triggering LastThird action");
-                        let _ = super::move_window(Some(Action::LastThird));
-                    }
-                    _ if normalized_shortcut == normalized_first_two_thirds => {
-                        println!("Triggering FirstTwoThirds action");
-                        let _ = super::move_window(Some(Action::FirstTwoThirds));
-                    }
-                    _ if normalized_shortcut == normalized_last_two_thirds => {
-                        println!("Triggering LastTwoThirds action");
-                        let _ = super::move_window(Some(Action::LastTwoThirds));
-                    }
-                    _ => {
-                        println!("No action found for shortcut: {}", shortcut_str);
-                    }
+                // Look up the action for this shortcut
+                if let Some((shortcut_id, action)) = shortcut_to_action.get(&normalized_shortcut) {
+                    println!("Triggering {} action for shortcut: {}", shortcut_id, shortcut_str);
+                    let _ = super::move_window(Some(action.clone()));
+                } else {
+                    println!("No action found for shortcut: {} (normalized: {})", shortcut_str, normalized_shortcut);
                 }
             }
         })
@@ -431,7 +369,8 @@ pub fn register_shortcuts(
         let mut errors = Vec::new();
         
         for (id, shortcut_cfg) in config.get_all_shortcuts() {
-            match Shortcut::from_str(&shortcut_cfg.default_shortcut) {
+            let translated_shortcut = translate_key_symbols(&shortcut_cfg.default_shortcut);
+            match Shortcut::from_str(&translated_shortcut) {
                 Ok(shortcut) => {
                     let shortcut_str = shortcut.to_string();
                     

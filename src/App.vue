@@ -1,8 +1,9 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import ShortcutInput from './components/ShortcutInput.vue';
+import shortcutsConfig from './shortcuts.json';
 
 // Icons
 import MoveLeftDisplay from './components/icons/MoveLeftDisplay.vue';
@@ -28,34 +29,16 @@ import LastThird from './components/icons/LastThird.vue';
 import FirstTwoThirds from './components/icons/FirstTwoThirds.vue';
 import LastTwoThirds from './components/icons/LastTwoThirds.vue';
 
-// Reactive state for shortcuts
-const shortcuts = ref({
-  leftHalf: 'Control+Alt+ArrowLeft',
-  rightHalf: 'Control+Alt+ArrowRight',
-  topHalf: 'Control+Alt+ArrowUp',
-  bottomHalf: 'Control+Alt+ArrowDown',
+// Reactive state for shortcuts - initialize with values from JSON
+const shortcuts = ref({});
 
-  topLeft: 'Control+Alt+U',
-  topRight: 'Control+Alt+I',
-  bottomLeft: 'Control+Alt+J',
-  bottomRight: 'Control+Alt+K',
-
-  maximizeWindow: 'Control+Alt+Enter',
-  almostMaximizeWindow: 'Shift+Control+Alt+Enter',
-  maximizeHeight: 'Shift+Control+Alt+ArrowUp',
-  makeSmaller: 'Control+Alt+Minus',
-  makeLarger: 'Control+Alt+Equals',
-  center: 'Control+Alt+C',
-  restore: 'Control+Alt+Backspace',
-
-  moveMonitorLeft: 'Shift+Control+Alt+ArrowLeft',
-  moveMonitorRight: 'Shift+Control+Alt+ArrowRight',
-
-  firstThird: 'Control+Alt+D',
-  centerThird: 'Control+Alt+F',
-  lastThird: 'Control+Alt+G',
-  firstTwoThirds: 'Control+Alt+E',
-  lastTwoThirds: 'Control+Alt+T'
+// Load shortcuts from JSON config
+onMounted(() => {
+  const shortcutsFromConfig = {};
+  for (const [key, config] of Object.entries(shortcutsConfig.shortcuts)) {
+    shortcutsFromConfig[key] = config.defaultShortcut;
+  }
+  shortcuts.value = shortcutsFromConfig;
 });
 
 // Handle window close
