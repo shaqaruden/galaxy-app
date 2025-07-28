@@ -43,8 +43,20 @@ onMounted(() => {
 
 // Handle window close - hide instead of closing to keep app in tray
 async function closeWindow() {
-  const window = await getCurrentWindow();
-  await window.hide();
+  try {
+    console.log('Close button clicked - hiding window');
+    const window = await getCurrentWindow();
+    await window.hide();
+    console.log('Window hidden successfully');
+  } catch (error) {
+    console.error('Error hiding window:', error);
+    // Fallback: try using the invoke command
+    try {
+      await invoke('toggle_window');
+    } catch (invokeError) {
+      console.error('Error with toggle_window:', invokeError);
+    }
+  }
 }
 
 // Handle shortcut save

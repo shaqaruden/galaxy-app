@@ -294,9 +294,9 @@ pub fn run() {
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
-                    // Hide instead of closing
-                    window.hide().unwrap();
+                    // Prevent close and hide window instead
                     api.prevent_close();
+                    let _ = window.hide();
                 }
                 _ => {}
             }
@@ -310,8 +310,10 @@ pub fn run() {
                 let menu = Menu::with_items(app, &[&open_settings, &quit])?;
 
                 // Create system tray
+                let tray_icon = include_bytes!("../icons/32x32.png");
+                let image = tauri::image::Image::from_bytes(tray_icon)?;
                 let _tray = TrayIconBuilder::with_id("main_tray")
-                    .icon(app.default_window_icon().unwrap().clone())
+                    .icon(image)
                     .menu(&menu)
                     .show_menu_on_left_click(false)
                     .on_menu_event(move |app, event| match event.id.as_ref() {
