@@ -237,6 +237,35 @@ impl Default for ShortcutsConfig {
 
 impl ShortcutsConfig {
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
+        println!("Loading shortcuts from bundled resource...");
+        
+        // Try to load from bundled resource first (production)
+        match Self::load_from_resource() {
+            Ok(config) => {
+                println!("Successfully loaded shortcuts from bundled resource: {} shortcuts", config.shortcuts.len());
+                return Ok(config);
+            }
+            Err(e) => {
+                println!("Failed to load from bundled resource: {}", e);
+                println!("Falling back to file system (development mode)...");
+            }
+        }
+        
+        // Fallback to file system (development)
+        Self::load_from_file()
+    }
+    
+    fn load_from_resource() -> Result<Self, Box<dyn std::error::Error>> {
+        // In production, the file is bundled as a resource
+        let config_content = include_str!("../../src/shortcuts.json");
+        
+        let parsed: ShortcutsConfig = serde_json::from_str(config_content)
+            .map_err(|e| format!("Failed to parse bundled shortcuts.json: {}", e))?;
+            
+        Ok(parsed)
+    }
+    
+    fn load_from_file() -> Result<Self, Box<dyn std::error::Error>> {
         // Get the path to the shortcuts.json file in the frontend directory
         let frontend_dir = std::env::current_dir()?.parent().unwrap().join("src");
         let config_path = frontend_dir.join("shortcuts.json");
