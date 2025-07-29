@@ -1197,7 +1197,7 @@ dependencies = [
 
 [[package]]
 name = "galaxy"
-version = "0.1.0"
+version = "0.9.1"
 dependencies = [
  "clap",
  "once_cell",

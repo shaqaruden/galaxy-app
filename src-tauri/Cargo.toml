@@ -1,6 +1,6 @@
 [package]
 name = "galaxy"
-version = "0.1.0"
+version = "0.9.1"
 description = "Galaxy Window Manager"
 authors = ["you"]
 edition = "2021"
