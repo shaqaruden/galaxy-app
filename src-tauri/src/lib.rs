@@ -19,6 +19,9 @@ use window_actions::*;
 // Global storage for monitor information
 static MONITORS: Lazy<Mutex<Vec<MonitorInfo>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
+// Global debug mode flag
+static DEBUG_MODE: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+
 #[derive(Clone, Debug)]
 pub struct MonitorInfo {
     // Full monitor dimensions
@@ -106,7 +109,10 @@ impl Action {
 /// Moves the currently focused window to a new position and/or size.
 #[tauri::command]
 fn move_window(action: Option<Action>) -> Result<(), String> {
-    println!("move_window called with action: {:?}", action);
+    let debug_enabled = *DEBUG_MODE.lock().unwrap();
+    if debug_enabled {
+        println!("move_window called with action: {:?}", action);
+    }
 
     #[cfg(target_os = "windows")]
     {
@@ -183,12 +189,17 @@ fn move_window(action: Option<Action>) -> Result<(), String> {
             );
 
             if result != 0 {
-                println!(
-                    "Window moved successfully to {}x{} at ({},{})",
-                    new_width, new_height, new_x, new_y
-                );
+                if debug_enabled {
+                    println!(
+                        "Window moved successfully to {}x{} at ({},{})",
+                        new_width, new_height, new_x, new_y
+                    );
+                }
                 Ok(())
             } else {
+                if debug_enabled {
+                    println!("Failed to move/resize window");
+                }
                 Err("Failed to move/resize window".to_string())
             }
         }
@@ -237,10 +248,13 @@ unsafe extern "system" fn enum_monitor_callback(
     {
         let width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
         let height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
-        println!(
-            "Monitor at ({}, {}): {}x{}",
-            monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, width, height
-        );
+        let debug_enabled = *DEBUG_MODE.lock().unwrap();
+        if debug_enabled {
+            println!(
+                "Monitor at ({}, {}): {}x{}",
+                monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, width, height
+            );
+        }
 
         // Store monitor information
         MONITORS.lock().unwrap().push(MonitorInfo {
@@ -277,7 +291,13 @@ fn toggle_window(app: AppHandle) {
     }
 }
 
-pub fn run() {
+pub fn run(debug_mode: bool) {
+    // Set global debug mode
+    *DEBUG_MODE.lock().unwrap() = debug_mode;
+    
+    if debug_mode {
+        println!("Galaxy Window Manager starting in debug mode...");
+    }
     // Create the shared shortcut config ONCE
     let shortcuts_config = Arc::new(Mutex::new(
         shortcuts::ShortcutsConfig::load().unwrap_or_default(),
@@ -337,6 +357,8 @@ pub fn run() {
                     if let Err(e) = shortcuts::register_shortcuts(app, shortcuts_config.clone()) {
                         eprintln!("Failed to register shortcuts: {}", e);
                         return Err(e.into());
+                    } else if debug_mode {
+                        println!("Shortcuts registered successfully");
                     }
                 }
                 Ok(())
