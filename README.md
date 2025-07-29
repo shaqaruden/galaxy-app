@@ -89,6 +89,20 @@ pnpm tauri build
 3. **Customize**: Click the keyboard icon in any shortcut field and press your desired key combination
 4. **Use**: Press any configured shortcut to instantly position your active window
 
+### Debug Mode
+For troubleshooting and development purposes, you can run the application with debug logging:
+
+```bash
+# Run with debug console output
+galaxy.exe --debug
+```
+
+This will:
+- Show a console window with detailed logging
+- Display shortcut registration status
+- Show window movement operations
+- Help diagnose any issues with shortcuts or window positioning
+
 ### Customizing Shortcuts
 1. Open the settings window from the system tray
 2. Click the keyboard icon in any shortcut field
@@ -156,6 +170,7 @@ Shortcuts are stored in `src/shortcuts.json` and can be manually edited:
 **Application not starting**
 - Check Windows Event Viewer for error messages
 - Verify Windows version compatibility
+- Run with `--debug` flag to see detailed error messages
 
 ## Contributing
 
