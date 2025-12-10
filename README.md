@@ -1,9 +1,15 @@
+<h1 align="center">THIS REPO IS ARCHIVED</h1>
+<p align="center">
+  Active work on this project has been moved to CodeBerg. See the new repo <a href="https://codeberg.org/shaqaruden/galaxy-app"
+</p>
+
+---
+
 <p align="center">
   <img src="./src-tauri/icons/Square150x150Logo.png" />
   <h1 align="center">Galaxy Window Manager</h1>
   <p align="center">*Application name and icon are temporary.*</p>
 </p>
-
 
 A powerful, lightweight window management utility for Windows that runs quietly in your system tray while providing instant window positioning and resizing through keyboard shortcuts. Inspired by [Rectangle](https://rectangleapp.com/) for macOS.
 
