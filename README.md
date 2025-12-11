@@ -1,6 +1,6 @@
 <h1 align="center">THIS REPO IS ARCHIVED</h1>
 <p align="center">
-  Active work on this project has been moved to CodeBerg. See the new repo <a href="https://codeberg.org/shaqaruden/galaxy-app"
+  Active work on this project has been moved to CodeBerg. See the new repo <a href="https://codeberg.org/shaqaruden/galaxy-app">here</a>
 </p>
 
 ---
